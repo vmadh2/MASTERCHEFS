@@ -1,17 +1,13 @@
 <template>
   <div id="app">
-    <HomePage />
+    <!-- router-view renders the component for the current route -->
+    <router-view />
   </div>
 </template>
 
 <script>
-import HomePage from './components/HomePage.vue';
-
 export default {
   name: 'App',
-  components: {
-    HomePage,
-  },
 };
 </script>
 

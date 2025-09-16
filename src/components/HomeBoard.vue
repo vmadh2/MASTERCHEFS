@@ -5,6 +5,13 @@
         <h1 class="title is-1">Welcome Home!</h1>
         <h2 class="subtitle is-3">Explore our floating ideas.</h2>
 
+        <!-- Bulma button linking to Private Board -->
+        <div style="margin: 1.5rem 0;">
+          <router-link to="/private-board" class="button is-primary is-medium">
+            Go to Private Board
+          </router-link>
+        </div>
+
         <div class="bubble-container">
           <div
             v-for="(bubble, index) in bubbles"
@@ -23,7 +30,7 @@
 
 <script>
 export default {
-  name: 'HomePage',
+  name: 'HomeBoard',
   data() {
     return {
       bubbles: [
