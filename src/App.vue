@@ -1,11 +1,25 @@
-<script setup></script>
-
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <div id="app">
+    <HomePage />
+  </div>
 </template>
 
-<style scoped></style>
+<script>
+import HomePage from './components/HomePage.vue';
+
+export default {
+  name: 'App',
+  components: {
+    HomePage,
+  },
+};
+</script>
+
+<style>
+/* You might want some global styling here if needed */
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent scroll if bubbles go outside */
+}
+</style>
