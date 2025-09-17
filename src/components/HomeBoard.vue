@@ -12,7 +12,7 @@
           </router-link>
         </div>
 
-        <div class="bubble-container">
+        <div class="bubble-container" is-primary is-large>
           <div
             v-for="(bubble, index) in bubbles"
             :key="index"
