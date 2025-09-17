@@ -47,11 +47,11 @@ export default {
       bubbles: [
         { text: 'Innovation', colorClass: 'is-pastel-red', x: 10, y: 20, size: 100, delay: 0 },
         { text: 'Creativity', colorClass: 'is-pastel-green', x: 70, y: 10, size: 120, delay: 2 },
-        { text: 'Community', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 90, delay: 1 },
+        { text: 'Community', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 105, delay: 1 },
         { text: 'Growth', colorClass: 'is-pastel-green', x: 55, y: 30, size: 110, delay: 3 },
         { text: 'Harmony', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
         { text: 'Discovery', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
-        { text: 'Table Tennis', colorClass: 'is-pastel-green', x: 40, y: 80, size: 115, delay: 1.5 },
+        { text: 'Table Tennis', colorClass: 'is-pastel-green', x: 70, y: 80, size: 115, delay: 1.5 },
         { text: 'PRACTICE', colorClass: 'is-pastel-green', x: 40, y: 80, size: 90, delay: 1.5 },
       ],
       // reactive container dimensions
