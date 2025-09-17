@@ -52,8 +52,7 @@ export default {
         { text: 'Harmony', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
         { text: 'Discovery', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
         { text: 'Table Tennis', colorClass: 'is-pastel-green', x: 40, y: 80, size: 115, delay: 1.5 },
-        { text: 'ROOFIE PRACTICE', colorClass: 'is-pastel-green', x: 40, y: 80, size: 300, delay: 1.5 },
-        // Add more bubbles as needed
+        { text: 'PRACTICE', colorClass: 'is-pastel-green', x: 40, y: 80, size: 90, delay: 1.5 },
       ],
       // reactive container dimensions
       containerWidth: 0,
@@ -65,15 +64,25 @@ export default {
     updateContainerSize() {
       const el = this.$refs.bubbleContainer;
       if (el) {
-        // measure the container that holds bubbles
+        // measure fixed bars (use actual DOM heights if available)
+        const topBar = document.querySelector('.topbar');
+        const bottomBar = document.querySelector('.bottombar');
+        const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
+        const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
+
+        // available space strictly between the bars
+        const availableHeight = Math.max(120, window.innerHeight - topH - bottomH);
+
+        // explicitly set the bubble container height so positioning math matches visible space
+        el.style.height = `${availableHeight}px`;
+
+        // then read the actual client sizes (after setting height)
         this.containerWidth = el.clientWidth || 0;
         this.containerHeight = el.clientHeight || 0;
       }
     },
 
     bubbleStyle(bubble) {
-      // If we have container dimensions, compute pixel positions and clamp
-      // so the bubble remains fully visible inside the container.
       const w = this.containerWidth;
       const h = this.containerHeight;
       const size = bubble.size || 0;
@@ -94,9 +103,12 @@ export default {
         let leftPx = (bubble.x / 100) * w;
         let topPx = (bubble.y / 100) * h;
 
-        // ensure bubble stays fully inside container
+        // account for float animation vertical movement so bubbles don't get pushed past the edge
+        const safetyMargin = 22; // px (accounts for animation and shadows)
+
+        // ensure bubble stays fully inside container (include safety margin)
         const maxLeft = Math.max(0, w - sizeClamp);
-        const maxTop = Math.max(0, h - sizeClamp);
+        const maxTop = Math.max(0, h - sizeClamp - safetyMargin);
 
         leftPx = Math.max(0, Math.min(leftPx, maxLeft));
         topPx = Math.max(0, Math.min(topPx, maxTop));
@@ -120,7 +132,7 @@ export default {
 
   mounted() {
     // measure container after mount and on resize
-    this.updateContainerSize();
+    this.$nextTick(() => this.updateContainerSize());
     this._resizeHandler = () => this.updateContainerSize();
     window.addEventListener('resize', this._resizeHandler);
   },
@@ -135,7 +147,6 @@ export default {
 .bubble-container {
   position: relative;
   width: 100%;
-  height: calc(100vh - 72px - 72px); /* fill exact space between bars */
   overflow: visible; /* allow shadows to show and prevent clipping */
   margin: 0 auto;
 }
@@ -160,11 +171,19 @@ export default {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  padding-top: 72px; /* reserve space for top bar */
-  padding-bottom: 72px; /* reserve space for bottom bar */
 }
 
-.container.stretch { height: calc(100vh - 72px - 72px); }
+/* remove the fixed container.stretch height to avoid double-calculation
+   the bubble-container will be sized by JS to the exact space between bars */
+.container.stretch { height: auto; }
+
+/* Keep bubble-container height set by JS */
+.bubble-container {
+  position: relative;
+  width: 100%;
+  overflow: visible; /* allow shadows to show and prevent clipping */
+  margin: 0 auto;
+}
 
 /* Top bar styles */
 .topbar {
@@ -253,13 +272,13 @@ export default {
 
 /* Pastel Colors */
 .is-pastel-red {
-  background-color: #ffb3ba; /* Light Coral */
+  background-color: #d75966; /* Light Coral */
 }
 .is-pastel-green {
-  background-color: #bae1ff; /* Light Cyan */
+  background-color: #4794cf; /* Light Cyan */
 }
 .is-pastel-blue {
-  background-color: #baffc9; /* Light Green */
+  background-color: #39a551; /* Light Green */
 }
 
 
