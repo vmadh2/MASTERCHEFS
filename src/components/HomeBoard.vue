@@ -3,7 +3,15 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="topbar-title">"THE INTERACTIVE BULLETIN"</div>
-      <button class="login-btn">Login</button>
+      <router-link
+        :to="{ name: 'form-sheet' }"
+        class="login-btn"
+        role="button"
+        aria-label="Open form sheet"
+        style="display:flex;align-items:center;justify-content:center"
+      >
+      Post
+      </router-link>
     </div>
   </header>
 

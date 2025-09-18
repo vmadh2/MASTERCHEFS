@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- router-view renders the component for the current route -->
-    <router-view />. 
+    <router-view />
   </div>
 </template>
 

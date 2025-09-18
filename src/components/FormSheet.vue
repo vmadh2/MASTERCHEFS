@@ -13,7 +13,7 @@
           <option value="Favour">Favour</option>
           <option value="Question">Question</option>
           <option value="Announcement">Announcement</option>
-        </select>
+        </select> 
 
         <label>Name:</label>
         <input type="text" required v-model="name" />
@@ -24,7 +24,10 @@
         <label>Content:</label>
         <textarea required v-model="message" rows="5" placeholder="Enter your message"></textarea>
 
-        <button type="submit" class="post-btn">Post</button>
+        <!-- added: Back to Home button (left) -->
+        <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
+
+        <button type="button" class="post-btn" @click="sendData().then(() => $router.push('/homeboard')).catch(() => {})">Post</button>
       </form>
     </div>
   </div>
@@ -172,10 +175,22 @@ textarea {
   margin-top: 12px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   transition: background 0.2s;
+
+  /* center the button text */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .post-btn:hover {
   background: #2ba6b0;
+}
+
+/* added: mirror Post button style but align left */
+.back-btn {
+  float: left;
+  margin-top: 12px;
 }
 
 body, html {
