@@ -10,11 +10,6 @@ const router = createRouter({
       name: 'home-board',
       component: HomeBoard
     },
-    {
-      path: '/private-board',
-      name: 'private-board',
-      component: PrivateBoard
-    },
   ],
 })
 
