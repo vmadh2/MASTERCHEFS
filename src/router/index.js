@@ -9,7 +9,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'form-sheet',
-      component: FormSheet
+      component: HomeBoard
     },
   ],
 })
