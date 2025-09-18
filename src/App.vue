@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- router-view renders the component for the current route -->
-    <router-view />. ARYAN WAS HERE
+    <router-view />. 
   </div>
 </template>
 
@@ -12,10 +12,9 @@ export default {
 </script>
 
 <style>
-/* You might want some global styling here if needed */
 body, html {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Prevent scroll if bubbles go outside */
+  background-color: #747070; /* Change this to your desired color */
 }
 </style>
