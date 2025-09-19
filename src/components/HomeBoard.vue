@@ -3,7 +3,15 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="topbar-title">"THE INTERACTIVE BULLETIN"</div>
-      <button class="login-btn">Login</button>
+      <router-link
+        :to="{ name: 'form-sheet' }"
+        class="login-btn"
+        role="button"
+        aria-label="Open form sheet"
+        style="display:flex;align-items:center;justify-content:center"
+      >
+      Post
+      </router-link>
     </div>
   </header>
 
@@ -32,7 +40,35 @@
     <div class="bottombar-inner">
       <div class="bottombar-left">Public</div>
       <div class="bottombar-toggle" role="switch" aria-checked="false">
-        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <div
+          class="toggle-track"
+          role="switch"
+          aria-checked="false"
+          tabindex="0"
+          aria-label="Toggle visibility between Public and Private"
+          onclick="(function(e){
+            const track = e.currentTarget || e.target;
+            const on = track.classList.toggle('is-on');
+            track.setAttribute('aria-checked', on);
+            const thumb = track.querySelector('.toggle-thumb');
+            if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
+          })(event)"
+          onkeydown="if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            (function(e){
+              const track = e.currentTarget || e.target;
+              const on = track.classList.toggle('is-on');
+              track.setAttribute('aria-checked', on);
+              const thumb = track.querySelector('.toggle-thumb');
+              if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
+            })(event);
+          }"
+        >
+          <div
+            class="toggle-thumb"
+            style="transition: transform 0.22s cubic-bezier(.2,.9,.2,1);"
+          ></div>
+        </div>
       </div>
       <div class="bottombar-right">Private</div>
     </div>
@@ -45,14 +81,14 @@ export default {
   data() {
     return {
       bubbles: [
-        { text: 'Innovation', colorClass: 'is-pastel-red', x: 10, y: 20, size: 100, delay: 0 },
-        { text: 'Creativity', colorClass: 'is-pastel-green', x: 70, y: 10, size: 120, delay: 2 },
-        { text: 'Community', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 105, delay: 1 },
-        { text: 'Growth', colorClass: 'is-pastel-green', x: 55, y: 30, size: 110, delay: 3 },
-        { text: 'Harmony', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
-        { text: 'Discovery', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
-        { text: 'Table Tennis', colorClass: 'is-pastel-green', x: 70, y: 80, size: 115, delay: 1.5 },
-        { text: 'PRACTICE', colorClass: 'is-pastel-green', x: 40, y: 80, size: 90, delay: 1.5 },
+        { text: 'Hotpot', colorClass: 'is-pastel-red', x: 10, y: 20, size: 100, delay: 0 },
+        { text: 'Soccer', colorClass: 'is-pastel-green', x: 70, y: 10, size: 120, delay: 2 },
+        { text: 'Charger', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 105, delay: 1 },
+        { text: 'NFL', colorClass: 'is-pastel-green', x: 55, y: 30, size: 110, delay: 3 },
+        { text: 'Coffee', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
+        { text: 'Pen', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
+        { text: 'table-tennis', colorClass: 'is-pastel-green', x: 70, y: 80, size: 115, delay: 1.5 },
+        { text: 'Excel', colorClass: 'is-pastel-green', x: 40, y: 80, size: 200, delay: 1.5 },
       ],
       // reactive container dimensions
       containerWidth: 0,

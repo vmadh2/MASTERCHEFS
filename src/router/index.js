@@ -8,8 +8,17 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'home-board',
+      component: HomeBoard
+    },
+    {
+      path: '/formsheet',
       name: 'form-sheet',
       component: HomeBoard
+    },
+    { path: '/privateboard', 
+      name: 'private-board', 
+      component: PrivateBoard 
     },
   ],
 })
