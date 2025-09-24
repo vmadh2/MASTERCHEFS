@@ -13,7 +13,7 @@
           <option value="Favour">Favour</option>
           <option value="Question">Question</option>
           <option value="Announcement">Announcement</option>
-        </select> 
+        </select>
 
         <label>Name:</label>
         <input type="text" required v-model="name" />
