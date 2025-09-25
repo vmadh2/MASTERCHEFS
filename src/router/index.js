@@ -14,7 +14,7 @@ const router = createRouter({
     {
       path: '/formsheet',
       name: 'form-sheet',
-      component: HomeBoard
+      component: FormSheet
     },
     { path: '/privateboard', 
       name: 'private-board', 
