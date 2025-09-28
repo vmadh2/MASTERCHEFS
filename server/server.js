@@ -106,6 +106,28 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// API: return first five documents from 'formSubmission' collection
+app.get('/api/first-five', async (req, res) => {
+  try {
+    const coll = db.collection('formSubmission');
+    let query = coll.limit(5);
+    // prefer ordering by timestamp if available
+    try {
+      query = coll.orderBy('timestamp', 'desc').limit(5);
+    } catch (e) {
+      // collection may not have timestamp field or index; fall back to unordered limit
+      query = coll.limit(5);
+    }
+    const snapshot = await query.get();
+    const items = [];
+    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+    res.json(items);
+  } catch (err) {
+    console.error('Error in /api/first-five:', err);
+    res.status(500).json({ error: 'Failed to fetch first five documents' });
+  }
+});
+
 app.post('/api/send-data', async (req, res) => {
   const { name, email, message } = req.body;
   try {
