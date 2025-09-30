@@ -85,52 +85,79 @@ if (rawPk.startsWith('"') && rawPk.endsWith('"')) {
 
 const pk = rawPk.includes('\\n') ? rawPk.replace(/\\n/g, '\n') : rawPk;
 
-if (!pid || !email || !pk) {
-  console.error('Firebase credentials missing. Please set the following in your .env: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
-  console.error('Note: FIREBASE_PRIVATE_KEY must be the full key with escaped\\n sequences (no raw multiline value) or properly quoted.');
-  process.exit(1);
-}
+let db = null;
+
+// Provide clear placeholders so you can replace them in your .env later.
+const PLACEHOLDER_PID = 'YOUR_FIREBASE_PROJECT_ID';
+const PLACEHOLDER_EMAIL = 'YOUR_FIREBASE_CLIENT_EMAIL@PROJECT.iam.gserviceaccount.com';
+const PLACEHOLDER_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\\nREPLACE_WITH_YOUR_PRIVATE_KEY\\n-----END PRIVATE KEY-----\\n';
+
+const pidUsed = pid || PLACEHOLDER_PID;
+const emailUsed = email || PLACEHOLDER_EMAIL;
+const pkUsed = (pk && pk.length > 10) ? pk : PLACEHOLDER_PRIVATE_KEY.replace(/\\n/g, '\\n');
 
 serviceAccount = {
   type: 'service_account',
-  project_id: pid,
+  project_id: pidUsed,
   private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || undefined,
-  private_key: pk,
-  client_email: email,
+  private_key: pkUsed.includes('\\n') ? pkUsed.replace(/\\n/g, '\n') : pkUsed,
+  client_email: emailUsed,
   client_id: process.env.FIREBASE_CLIENT_ID || undefined,
 };
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Try to initialize Firebase admin — if credentials are placeholders or invalid this may fail.
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  db = admin.firestore();
+  console.log('Firebase Admin initialized.');
+} catch (err) {
+  console.warn('Firebase Admin failed to initialize (placeholders may be in use). Replace credentials in .env to enable Firestore access.');
+  console.warn(err && err.message ? err.message : err);
+  db = null; // keep server running; endpoints will report 503 when Firestore isn't available
+}
 
-const db = admin.firestore();
-
-// API: return first five documents from 'formSubmission' collection
+// API: return first five bubbles from 'bubbles' collection ordered by bubble_created desc
 app.get('/api/first-five', async (req, res) => {
   try {
-    const coll = db.collection('formSubmission');
-    let query = coll.limit(5);
-    // prefer ordering by timestamp if available
-    try {
-      query = coll.orderBy('timestamp', 'desc').limit(5);
-    } catch (e) {
-      // collection may not have timestamp field or index; fall back to unordered limit
-      query = coll.limit(5);
+    if (!db) {
+      return res.status(503).json({ error: 'Firestore not initialized. Replace Firebase placeholders in .env with real credentials.' });
     }
-    const snapshot = await query.get();
+
+    const coll = db.collection('bubbles');
+    let q = coll.orderBy('bubble_created', 'desc').limit(5);
+    const snapshot = await q.get();
     const items = [];
-    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      items.push({
+        id: doc.id,
+        title: d.title || d.name || d.text || null,
+        event_type: d.event_type || d.type || null,
+        bubble_created: d.bubble_created || d.timestamp || null,
+        // include event-specific fields if present
+        event_title: d.event_title || d.eventName || d.title || d.name || null,
+        event_when: d.event_when || d.when || d.date || d.bubble_created || null,
+        x: d.x || null,
+        y: d.y || null,
+        size: d.size || null,
+        color: d.color || null,
+        raw: d
+      });
+    });
     res.json(items);
   } catch (err) {
     console.error('Error in /api/first-five:', err);
-    res.status(500).json({ error: 'Failed to fetch first five documents' });
+    res.status(500).json({ error: 'Failed to fetch first five bubbles' });
   }
 });
 
 app.post('/api/send-data', async (req, res) => {
   const { name, email, message } = req.body;
   try {
+    if (!db) return res.status(503).send('Firestore not initialized. Replace Firebase placeholders in .env with real credentials.');
+
     await db.collection('formSubmissions').add({
       name,
       email,

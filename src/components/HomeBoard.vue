@@ -12,6 +12,15 @@
       >
       Post
       </router-link>
+      <router-link
+        :to="{ name: 'test' }"
+        class="test-btn"
+        role="button"
+        aria-label="Open test page"
+        style="display:flex;align-items:center;justify-content:center"
+      >
+      Test
+      </router-link>
     </div>
   </header>
 
@@ -80,16 +89,8 @@ export default {
   name: 'HomeBoard',
   data() {
     return {
-      bubbles: [
-        { text: 'Hotpot', colorClass: 'is-pastel-red', x: 10, y: 20, size: 100, delay: 0 },
-        { text: 'Soccer', colorClass: 'is-pastel-green', x: 70, y: 10, size: 120, delay: 2 },
-        { text: 'Charger', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 105, delay: 1 },
-        { text: 'NFL', colorClass: 'is-pastel-green', x: 55, y: 30, size: 110, delay: 3 },
-        { text: 'Coffee', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
-        { text: 'Pen', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
-        { text: 'table-tennis', colorClass: 'is-pastel-green', x: 70, y: 80, size: 115, delay: 1.5 },
-        { text: 'Excel', colorClass: 'is-pastel-green', x: 40, y: 80, size: 200, delay: 1.5 },
-      ],
+      // start empty; we'll load bubbles from the API
+      bubbles: [],
       // reactive container dimensions
       containerWidth: 0,
       containerHeight: 0,
@@ -164,14 +165,78 @@ export default {
 
       return style;
     }
+    ,
+
+    // Fetch bubbles from server and map event_type to visual layout
+    async fetchBubbles() {
+      try {
+        const res = await fetch('/api/first-five');
+        if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+        const docs = await res.json();
+
+        // mapping of event types to horizontal regions and color classes
+        const typeRegion = {
+          news: { xMin: 6, xMax: 28, color: 'is-pastel-red' },
+          events: { xMin: 36, xMax: 64, color: 'is-pastel-green' },
+          articles: { xMin: 72, xMax: 94, color: 'is-pastel-blue' },
+          announcements: { xMin: 36, xMax: 64, color: 'is-pastel-red' },
+          misc: { xMin: 40, xMax: 60, color: 'is-pastel-green' }
+        };
+
+        // counters per event type so multiple items in same type distribute vertically
+        const counters = {};
+
+        const mapped = docs.map((doc, idx) => {
+          const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase();
+          const region = typeRegion[type] || typeRegion.misc;
+          counters[type] = (counters[type] || 0) + 1;
+          const countIndex = counters[type] - 1;
+
+          // deterministic position within region
+          const xRange = region.xMax - region.xMin;
+          const x = Math.round(region.xMin + (countIndex * 13) % xRange);
+          const y = Math.round(12 + (countIndex * 18) % 76);
+
+          const size = doc.size || 90 + (idx * 6) % 80;
+          const delay = (idx * 0.6) % 6;
+
+          const title = doc.title || doc.raw?.title || doc.raw?.name || doc.raw?.text || doc.raw?.message || `Bubble ${idx + 1}`;
+
+          return {
+            text: title,
+            colorClass: region.color,
+            x,
+            y,
+            size,
+            delay,
+            raw: doc
+          };
+        });
+
+        this.bubbles = mapped;
+        this.$nextTick(() => this.updateContainerSize());
+      } catch (err) {
+        console.error('Failed to load bubbles:', err);
+        // fallback small bubble so UI doesn't break
+        if (!this.bubbles || this.bubbles.length === 0) {
+          this.bubbles = [{ text: 'Offline', colorClass: 'is-pastel-blue', x:50, y:60, size:100, delay:0 }];
+        }
+      }
+    }
   },
 
   mounted() {
     // measure container after mount and on resize
-    this.$nextTick(() => this.updateContainerSize());
+    this.$nextTick(() => {
+      this.updateContainerSize();
+      // fetch bubbles once layout is measured
+      this.fetchBubbles();
+    });
     this._resizeHandler = () => this.updateContainerSize();
     window.addEventListener('resize', this._resizeHandler);
   },
+
+  
 
   beforeUnmount() {
     if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
@@ -260,6 +325,22 @@ export default {
   cursor: pointer;
 }
 .login-btn:active { transform: translateY(1px); }
+
+.test-btn {
+  position: absolute;
+  right: 96px; /* sits left of the Post button which is 18px from right */
+  top: 12px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: #ffd166; /* warm yellow */
+  color: #073642;
+  font-weight: 700;
+  border: none;
+  box-shadow: 4px 6px 8px rgba(0,0,0,0.12);
+  cursor: pointer;
+}
+.test-btn:active { transform: translateY(1px); }
 
 /* Ensure page content appears below the fixed topbar */
 .container { padding-top: 1rem; }
