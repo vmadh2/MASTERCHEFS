@@ -4,7 +4,7 @@
       <h2 class="section-title">{{ section.label }}</h2>
 
       <ul class="list">
-        <li v-for="item in section.items" :key="item.id" class="list-item">
+        <li v-for="item in section.items" :key="item.id" class="list-item" @click="selectItem(item)">
           <div class="item-title">{{ item.title }}</div>
           <div class="item-time">{{ formatTime(item.time) }}</div>
         </li>
@@ -16,11 +16,19 @@
         <span v-if="loading[section.key]" class="loading">Loading…</span>
       </div>
     </section>
+
+    <div v-if="selectedItem" class="details">
+      <h3>Details for {{ selectedItem.title }}</h3>
+      <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
+      <button @click="selectedItem = null">Close</button>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, ref } from 'vue'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '../firebase.js'
 
 const sections = reactive([
   { key: 'news', label: 'Food', items: [] },
@@ -29,6 +37,8 @@ const sections = reactive([
 ])
 
 const loading = reactive({ news: false, events: false, articles: false })
+
+const selectedItem = ref(null)
 
 function normalizeWhen(value) {
   if (!value) return ''
@@ -47,9 +57,24 @@ function normalizeWhen(value) {
 async function fetchBubbles() {
   loading.news = loading.events = loading.articles = true
   try {
-    const res = await fetch('/api/first-five')
-    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`)
-    const docs = await res.json()
+    const querySnapshot = await getDocs(collection(db, 'bubbles'))
+    const docs = []
+    querySnapshot.forEach((doc) => {
+      const d = doc.data()
+      docs.push({
+        id: doc.id,
+        title: d.title || d.name || d.text || null,
+        event_type: d.event_type || d.type || null,
+        bubble_created: d.bubble_created || d.timestamp || null,
+        event_title: d.event_title || d.eventName || d.title || d.name || null,
+        event_when: d.event_when || d.when || d.date || d.bubble_created || null,
+        x: d.x || null,
+        y: d.y || null,
+        size: d.size || null,
+        color: d.color || null,
+        raw: d
+      })
+    })
 
     sections.forEach((s) => (s.items = []))
 
@@ -62,6 +87,7 @@ async function fetchBubbles() {
         time: normalizeWhen(
           doc.event_when || doc.bubble_created || doc.raw?.event_when || doc.raw?.bubble_created
         ),
+        fullData: doc
       }
 
       if (type.includes('food')) sections[0].items.push(item)
@@ -69,7 +95,7 @@ async function fetchBubbles() {
       else sections[2].items.push(item)
     })
   } catch (err) {
-    console.error('Failed to fetch bubbles for TEST page:', err)
+    console.error('Failed to fetch bubbles:', err)
   } finally {
     loading.news = loading.events = loading.articles = false
   }
@@ -81,6 +107,10 @@ async function loadSection(_key) {
 
 async function refreshSection(_key) {
   await loadSection(_key)
+}
+
+function selectItem(item) {
+  selectedItem.value = item
 }
 
 onMounted(() => fetchBubbles())
@@ -160,5 +190,20 @@ function formatTime(iso) {
 .empty {
   color: #888;
   font-style: italic;
+}
+
+.details {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.details pre {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
 }
 </style>

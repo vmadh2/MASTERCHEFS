@@ -87,11 +87,7 @@ const pk = rawPk.includes('\\n') ? rawPk.replace(/\\n/g, '\n') : rawPk;
 
 let db = null;
 
-// Provide clear placeholders so you can replace them in your .env later.
-const PLACEHOLDER_PID = 'YOUR_FIREBASE_PROJECT_ID';
-const PLACEHOLDER_EMAIL = 'YOUR_FIREBASE_CLIENT_EMAIL@PROJECT.iam.gserviceaccount.com';
-const PLACEHOLDER_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\\nREPLACE_WITH_YOUR_PRIVATE_KEY\\n-----END PRIVATE KEY-----\\n';
-
+// using the raw env files
 const pidUsed = pid || PLACEHOLDER_PID;
 const emailUsed = email || PLACEHOLDER_EMAIL;
 const pkUsed = (pk && pk.length > 10) ? pk : PLACEHOLDER_PRIVATE_KEY.replace(/\\n/g, '\\n');
