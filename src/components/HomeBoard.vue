@@ -34,42 +34,46 @@
       </div>
     </div>
   </section>
-  
+
   <!-- Bottom bar (fixed) like the screenshot) -->
   <footer class="bottombar">
     <div class="bottombar-inner">
       <div class="bottombar-left">Public</div>
-      <div class="bottombar-toggle" role="switch" aria-checked="false">
+      <router-link
+        :to="{ name: 'private-board' }"
+        class="bottombar-toggle toggle-track"
+        role="switch"
+        aria-checked="false"
+        tabindex="0"
+        aria-label="Toggle visibility between Public and Private"
+        @click="(e) => {
+          const track = e.currentTarget || e.target;
+          const on = track.classList.toggle('is-on');
+          track.setAttribute('aria-checked', on);
+          const thumb = track.querySelector('.toggle-thumb');
+          if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
+        }"
+        @keydown.enter.prevent="(e) => {
+          const track = e.currentTarget || e.target;
+          const on = track.classList.toggle('is-on');
+          track.setAttribute('aria-checked', on);
+          const thumb = track.querySelector('.toggle-thumb');
+          if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
+        }"
+        @keydown.space.prevent="(e) => {
+          const track = e.currentTarget || e.target;
+          const on = track.classList.toggle('is-on');
+          track.setAttribute('aria-checked', on);
+          const thumb = track.querySelector('.toggle-thumb');
+          if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
+        }"
+        style="display:flex;align-items:center;justify-content:start"
+      >
         <div
-          class="toggle-track"
-          role="switch"
-          aria-checked="false"
-          tabindex="0"
-          aria-label="Toggle visibility between Public and Private"
-          onclick="(function(e){
-            const track = e.currentTarget || e.target;
-            const on = track.classList.toggle('is-on');
-            track.setAttribute('aria-checked', on);
-            const thumb = track.querySelector('.toggle-thumb');
-            if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
-          })(event)"
-          onkeydown="if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            (function(e){
-              const track = e.currentTarget || e.target;
-              const on = track.classList.toggle('is-on');
-              track.setAttribute('aria-checked', on);
-              const thumb = track.querySelector('.toggle-thumb');
-              if (thumb) thumb.style.transform = on ? 'translateX(30px)' : 'translateX(0)';
-            })(event);
-          }"
-        >
-          <div
-            class="toggle-thumb"
-            style="transition: transform 0.22s cubic-bezier(.2,.9,.2,1);"
-          ></div>
-        </div>
-      </div>
+          class="toggle-thumb"
+          style="transition: transform 0.22s cubic-bezier(.2,.9,.2,1);"
+        ></div>
+      </router-link>
       <div class="bottombar-right">Private</div>
     </div>
   </footer>

@@ -47,7 +47,7 @@
         aria-checked="false"
         tabindex="0"
         aria-label="Toggle visibility between Public and Private"
-        @click.native="(e) => {
+        @click="(e) => {
           const track = e.currentTarget || e.target;
           const on = track.classList.toggle('is-on');
           track.setAttribute('aria-checked', on);
