@@ -7,8 +7,8 @@
     <div class="form-container">
       <form @submit.prevent="sendData">
         <h2>Create New Post</h2>
-        <label>Category:</label>
-        <select v-model="category" required>
+        <label>Event type:</label>
+        <select v-model="eventType" required>
           <option value="" disabled>Select category</option>
           <option value="Favour">Favour</option>
           <option value="Question">Question</option>
@@ -16,13 +16,19 @@
         </select>
 
         <label>Name:</label>
-        <input type="text" required v-model="name" />
+        <input type="text" required v-model="authorName" />
 
-        <label>Email:</label>
-        <input type="email" required v-model="email" />
+        <label>Contact:</label>
+        <input type="email" required v-model="authorContact" />
 
-        <label>Content:</label>
-        <textarea required v-model="message" rows="5" placeholder="Enter your message"></textarea>
+        <label>Event Title:</label>
+        <input type="text" required v-model="eventTitle" />
+
+        <label>Date and Time of Event:</label>
+        <input type="datetime-local" required v-model="eventWhen" />
+
+        <label>Event Description:</label>
+        <textarea required v-model="message" rows="5" placeholder="Enter full details about the event..."></textarea>
 
         <!-- added: Back to Home button (left) -->
         <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
@@ -37,10 +43,11 @@
 export default {
   data() {
     return {
-      category: '',
-      name: '',
-      email: '',
-      message: ''
+      eventType: '',
+      authorName: '',
+      eventTitle: '',
+      eventWhen: '',
+      description: ''
     };
   },
   methods: {
@@ -55,18 +62,22 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            category: this.category,
-            name: this.name,
-            email: this.email,
-            message: this.message
+            event_type: this.eventType,
+            author_name: this.authorName,
+            author_contact: this.authorContact,
+            event_title: this.eventTitle,
+            event_when: this.eventWhen,
+            description: this.description
           })
         });
         alert('Data sent!');
-        this.category = '';
-        this.name = '';
-        this.email = '';
-        this.message = '';
-      } catch (err) {
+        this.eventType = '';
+        this.authorName = '';
+        this.authorContact = '';
+        this.eventTitle = '';
+        this.eventWhen = '';
+        this.description = '';
+      } catch {
         alert('Failed to send data.');
       }
     }
