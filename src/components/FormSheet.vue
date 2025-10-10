@@ -27,7 +27,7 @@
         <input type="datetime-local" required v-model="eventWhen" />
 
         <label>Event Description:</label>
-        <textarea required v-model="message" rows="5" placeholder="Enter full details about the event..."></textarea>
+        <textarea required v-model="description" rows="5" placeholder="Enter full details about the event..."></textarea>
 
         <!-- added: Back to Home button (left) -->
         <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
@@ -44,6 +44,7 @@ export default {
     return {
       eventType: '',
       authorName: '',
+      authorContact: '',
       eventTitle: '',
       eventWhen: '',
       description: ''
@@ -52,12 +53,14 @@ export default {
   methods: {
     async sendData() {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(this.email)) {
+
+      // 1. FIX: Validation must throw an error to block the .then() navigation.
+      if (!emailPattern.test(this.authorContact)) {
         alert('Please enter a valid email address.');
-        return;
+        throw new Error('Validation failed');
       }
       try {
-        await fetch('http://localhost:3000/api/send-data', {
+        const response = await fetch('http://localhost:3000/api/send-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -69,6 +72,12 @@ export default {
             description: this.description
           })
         });
+
+        if (!response.ok) {
+           // If the server responds with a 4xx or 5xx status, fail the promise
+           throw new Error(`Server responded with status: ${response.status}`);
+        }
+
         alert('Data sent!');
         this.eventType = '';
         this.authorName = '';
@@ -76,8 +85,10 @@ export default {
         this.eventTitle = '';
         this.eventWhen = '';
         this.description = '';
-      } catch {
+      } catch (err) {
+        // 2. FIX: Re-throw the error in the catch block to ensure navigation is blocked.
         alert('Failed to send data.');
+        throw err; // This rejects the promise, stopping $router.push() from running.
       }
     }
   }

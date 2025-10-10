@@ -107,12 +107,23 @@ admin.initializeApp({
 const db = admin.firestore();
 
 app.post('/api/send-data', async (req, res) => {
-  const { name, email, message } = req.body;
+  const {
+    event_type,
+    author_name,
+    author_contact,
+    event_title,
+    event_when,
+    description
+  } = req.body;
+
   try {
     await db.collection('formSubmissions').add({
-      name,
-      email,
-      message,
+      event_type,
+      author_name,
+      author_contact,
+      event_title,
+      event_when,
+      description,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
     res.sendStatus(200);
