@@ -2,7 +2,6 @@
   <div>
     <nav class="taskbar">
       <span class="app-title">Office Favours</span>
-      <img class="profile-img" src="../../images/profilePhoto.png" alt="Profile" />
     </nav>
     <div class="form-container">
       <form @submit.prevent="sendData">
