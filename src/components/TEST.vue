@@ -63,7 +63,6 @@ async function fetchBubbles() {
       const d = doc.data()
       docs.push({
         id: doc.id,
-        title: d.title || d.name || d.text || null,
         event_type: d.event_type || d.type || null,
         bubble_created: d.bubble_created || d.timestamp || null,
         event_title: d.event_title || d.eventName || d.title || d.name || null,

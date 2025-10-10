@@ -25,22 +25,25 @@
   </header>
 
   <section class="hero is-light">
-    <div class="hero-body is-align-items-center">
-      <div class="container has-text-centered stretch" style="width:100%;">
-
-
-  <div class="bubble-container" ref="bubbleContainer">
-          <div
-            v-for="(bubble, index) in bubbles"
-            :key="index"
-            class="bubble"
-            :class="bubble.colorClass"
-            :style="bubbleStyle(bubble)"
-          >
-            <p>{{ bubble.text }}</p>
-          </div>
-        </div>
+    <div class="bubble-container" ref="bubbleContainer">
+      <div
+        v-for="bubble in bubbles"
+        :key="bubble.id"
+        class="bubble"
+        :style="{
+          left: bubble.x + 'px',
+          top: bubble.y + 'px',
+          width: bubble.size + 'px',
+          height: bubble.size + 'px',
+          backgroundColor: bubble.color,
+          animation: 'float 6s ease-in-out infinite',
+          animationDelay: bubble.delay + 's'
+        }"
+        @click="selectBubble(bubble)"
+      >
+        {{ bubble.event_title || bubble.id }}
       </div>
+      <div v-if="loading.bubbles" class="loading">Loading bubbles…</div>
     </div>
   </section>
   
@@ -85,12 +88,16 @@
 </template>
 
 <script>
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '../firebase.js'
+
 export default {
   name: 'HomeBoard',
   data() {
     return {
       // start empty; we'll load bubbles from the API
       bubbles: [],
+      loading: { bubbles: false },
       // reactive container dimensions
       containerWidth: 0,
       containerHeight: 0,
@@ -99,23 +106,18 @@ export default {
   methods: {
     // Update container size when mounted or resized
     updateContainerSize() {
-      const el = this.$refs.bubbleContainer;
-      if (el) {
-        // measure fixed bars (use actual DOM heights if available)
-        const topBar = document.querySelector('.topbar');
-        const bottomBar = document.querySelector('.bottombar');
-        const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
-        const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
+  const el = this.$refs.bubbleContainer;
+  if (el) {
+    const topBar = document.querySelector('.topbar');
+    const bottomBar = document.querySelector('.bottombar');
+    const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
+    const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
 
-        // available space strictly between the bars
-        const availableHeight = Math.max(120, window.innerHeight - topH - bottomH);
-
-        // explicitly set the bubble container height so positioning math matches visible space
-        el.style.height = `${availableHeight}px`;
-
-        // then read the actual client sizes (after setting height)
-        this.containerWidth = el.clientWidth || 0;
-        this.containerHeight = el.clientHeight || 0;
+    const availableHeight = window.innerHeight - topH - bottomH;
+    el.style.height = `${availableHeight}px`;
+    el.style.minHeight = '0'; // Prevent any minimum height from adding space
+    this.containerWidth = el.clientWidth || 0;
+    this.containerHeight = el.clientHeight || 0;
       }
     },
 
@@ -167,76 +169,97 @@ export default {
     }
     ,
 
-    // Fetch bubbles from server and map event_type to visual layout
-    async fetchBubbles() {
-      try {
-        const res = await fetch('/api/first-five');
-        if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
-        const docs = await res.json();
+    },
 
-        // mapping of event types to horizontal regions and color classes
-        const typeRegion = {
-          news: { xMin: 6, xMax: 28, color: 'is-pastel-red' },
-          events: { xMin: 36, xMax: 64, color: 'is-pastel-green' },
-          articles: { xMin: 72, xMax: 94, color: 'is-pastel-blue' },
-          announcements: { xMin: 36, xMax: 64, color: 'is-pastel-red' },
-          misc: { xMin: 40, xMax: 60, color: 'is-pastel-green' }
-        };
+    selectBubble(bubble) {
+      // Handle bubble selection, e.g., show details
+      console.log('Selected bubble:', bubble);
+    },
 
-        // counters per event type so multiple items in same type distribute vertically
-        const counters = {};
-
-        const mapped = docs.map((doc, idx) => {
-          const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase();
-          const region = typeRegion[type] || typeRegion.misc;
-          counters[type] = (counters[type] || 0) + 1;
-          const countIndex = counters[type] - 1;
-
-          // deterministic position within region
-          const xRange = region.xMax - region.xMin;
-          const x = Math.round(region.xMin + (countIndex * 13) % xRange);
-          const y = Math.round(12 + (countIndex * 18) % 76);
-
-          const size = doc.size || 90 + (idx * 6) % 80;
-          const delay = (idx * 0.6) % 6;
-
-          const title = doc.title || doc.raw?.title || doc.raw?.name || doc.raw?.text || doc.raw?.message || `Bubble ${idx + 1}`;
-
-          return {
-            text: title,
-            colorClass: region.color,
-            x,
-            y,
-            size,
-            delay,
-            raw: doc
-          };
-        });
-
-        this.bubbles = mapped;
-        this.$nextTick(() => this.updateContainerSize());
-      } catch (err) {
-        console.error('Failed to load bubbles:', err);
-        // fallback small bubble so UI doesn't break
-        if (!this.bubbles || this.bubbles.length === 0) {
-          this.bubbles = [{ text: 'Offline', colorClass: 'is-pastel-blue', x:50, y:60, size:100, delay:0 }];
+    // Load bubbles from localStorage, fallback to fetch
+    loadBubbles() {
+      const stored = localStorage.getItem('bubbles');
+      if (stored) {
+        try {
+          this.bubbles = JSON.parse(stored);
+          this.$nextTick(() => this.updateContainerSize());
+        } catch (e) {
+          console.error('Failed to parse stored bubbles:', e);
+          this.fetchBubbles();
         }
+      } else {
+        this.fetchBubbles();
       }
+    },
+
+// Fetch bubbles from server and map event_type to visual layout
+async fetchBubbles() {
+  this.loading.bubbles = true;
+  try {
+    const querySnapshot = await getDocs(collection(db, 'bubbles'));
+    const docs = [];
+    querySnapshot.forEach((doc) => {
+      const d = doc.data();
+      docs.push({
+        id: doc.id,
+        event_type: d.event_type || d.type || null,
+        bubble_created: d.bubble_created || d.timestamp || null,
+        event_title: d.event_title || d.eventName || d.title || d.name || null,
+        event_when: d.event_when || d.when || d.date || d.bubble_created || null,
+        x: typeof d.x === 'number' ? d.x : 0,
+        y: typeof d.y === 'number' ? d.y : 0,
+        size: d.size || 50,
+        color: d.color || '#8de3ea',
+        raw: d
+      });
+    });
+
+    // Simple, safe mapping to UI bubbles (avoids relying on undefined helpers)
+    this.bubbles = docs.map((doc, idx) => {
+      const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase();
+      let color = '#4794cf'; // default blue for leisure/hobby
+      if (type.includes('food')) color = '#39a551'; // green for food
+      else if (type.includes('sport')) color = '#d75966'; // red for activity/sport
+
+      const title = doc.event_title || doc.raw?.title || doc.raw?.name || `Bubble ${idx + 1}`;
+      return {
+        id: doc.id,
+        text: title,
+        color: color,
+        x: typeof doc.x === 'number' ? doc.x : Math.round(10 + Math.random() * 80),
+        y: typeof doc.y === 'number' ? doc.y : Math.round(10 + Math.random() * 70),
+        size: doc.size || 70,
+        delay: (idx * 0.6) % 6,
+        raw: doc
+      };
+    });
+
+    // Store bubbles in localStorage
+    localStorage.setItem('bubbles', JSON.stringify(this.bubbles));
+
+    this.$nextTick(() => this.updateContainerSize());
+  } catch (err) {
+    console.error('Failed to load bubbles:', err);
+    // fallback small bubble so UI doesn't break
+    if (!this.bubbles || this.bubbles.length === 0) {
+      this.bubbles = [{ text: 'Offline', color: '#4794cf', x: 50, y: 60, size: 100, delay: 0 }];
     }
-  },
+  } finally {
+    this.loading.bubbles = false;
+  }
+},
+
 
   mounted() {
     // measure container after mount and on resize
     this.$nextTick(() => {
       this.updateContainerSize();
-      // fetch bubbles once layout is measured
-      this.fetchBubbles();
+      // load bubbles once layout is measured
+      this.loadBubbles();
     });
     this._resizeHandler = () => this.updateContainerSize();
     window.addEventListener('resize', this._resizeHandler);
   },
-
-  
 
   beforeUnmount() {
     if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
@@ -245,33 +268,44 @@ export default {
 </script>
 
 <style scoped>
+/* Ensure hero takes full height minus bars */
+.hero.is-light {
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 100vh; /* Initial fallback */
+  min-height: 0; /* Prevent min-height from adding space */
+  margin: 0;
+}
+
+/* Ensure bubble-container fills the hero */
 .bubble-container {
-  position: relative;
-  width: 100%;
-  overflow: visible; /* allow shadows to show and prevent clipping */
-  margin: 0 auto;
-}
-
-.bubble {
   position: absolute;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: white; /* Or a darker shade for contrast */
-  font-weight: bold;
-  font-size: 1.2em;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  animation: float 10s ease-in-out infinite; /* Main floating animation */
-  will-change: transform;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%; /* Override any JS-set height if needed */
+  overflow: visible;
+  margin: 0;
 }
 
-/* Ensure the hero-body centers its content vertically */
+/* Remove any default container stretching */
+.container.stretch {
+  height: 100%;
+  padding-top: 72px; /* Match topbar height to avoid overlap */
+  padding-bottom: 72px; /* Match bottombar height to avoid overlap */
+  margin: 0;
+}
+
+/* Ensure hero-body doesn't add extra space */
 .hero-body {
   display: flex;
   align-items: stretch;
   justify-content: center;
+  height: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 /* remove the fixed container.stretch height to avoid double-calculation
