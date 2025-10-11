@@ -32,13 +32,16 @@
         <!-- added: Back to Home button (left) -->
         <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
 
-        <router-link :to="{ name: 'home-board' }" class="post-btn" role="button" aria-label="Post" @click.native.prevent="sendData().then(() => $router.push({ name: 'home-board' })).catch(() => {})">Post</router-link>
+        <router-link :to="{ name: 'home-board' }" class="post-btn" role="button" aria-label="Post" @click.prevent="sendData().then(() => $router.push({ name: 'home-board' })).catch(() => {})">Post</router-link>
       </form>
     </div>
   </div>
 </template>
 
 <script>
+import { addDoc, Timestamp } from 'firebase/firestore';
+import { bubblesCollection } from '@/main.js'; // Adjust the path if main.js is not in src/
+
 export default {
   data() {
     return {
@@ -54,41 +57,45 @@ export default {
     async sendData() {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      // 1. FIX: Validation must throw an error to block the .then() navigation.
+      // Validation is correct and blocks navigation by throwing an error
       if (!emailPattern.test(this.authorContact)) {
         alert('Please enter a valid email address.');
         throw new Error('Validation failed');
       }
+
       try {
-        const response = await fetch('http://localhost:3000/api/send-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event_type: this.eventType,
-            author_name: this.authorName,
-            author_contact: this.authorContact,
-            event_title: this.eventTitle,
-            event_when: this.eventWhen,
-            description: this.description
-          })
-        });
+        // --- PREPARE THE DATA with all required fields ---
+        const newPost = {
+          event_type: this.eventType,
+          author_name: this.authorName,
+          author_contact: this.authorContact,
+          event_title: this.eventTitle,
+          event_when: new Date(this.eventWhen), // Converts the string to a Date object
+          description: this.description,
 
-        if (!response.ok) {
-           // If the server responds with a 4xx or 5xx status, fail the promise
-           throw new Error(`Server responded with status: ${response.status}`);
-        }
+          // --- Add default fields required by the app/database ---
+          bubble_active: true,
+          bubble_created: Timestamp.now(), // Uses imported Timestamp
+          event_attend: [this.authorName]
+        };
 
-        alert('Data sent!');
+        // --- Use imported addDoc and bubblesCollection ---
+        await addDoc(bubblesCollection, newPost);
+
+        alert('Data sent to Firebase Firestore!');
+
+        // Clear fields on success
         this.eventType = '';
         this.authorName = '';
         this.authorContact = '';
         this.eventTitle = '';
         this.eventWhen = '';
         this.description = '';
+
       } catch (err) {
-        // 2. FIX: Re-throw the error in the catch block to ensure navigation is blocked.
+        // Re-throwing the error ensures the promise rejects, preventing navigation.
         alert('Failed to send data.');
-        throw err; // This rejects the promise, stopping $router.push() from running.
+        throw err;
       }
     }
   }

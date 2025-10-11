@@ -198,7 +198,7 @@ export default {
       }
     },
 
-    async loadSection(_key) {
+    async loadSection() {
       await this.fetchBubbles()
     },
 
