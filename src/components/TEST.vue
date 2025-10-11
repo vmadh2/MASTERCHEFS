@@ -1,10 +1,8 @@
 <template>
   <div class="test-page container">
     <section v-for="section in sections" :key="section.key" class="section">
-      <h2 class="section-title">{{ section.label }}</h2>
-
       <ul class="list">
-        <li v-for="item in section.items" :key="item.id" class="list-item" @click="selectItem(item)">
+        <li v-for="item in section.items" :key="item.id" class="list-item" :class="{ 'small-event': item.title.toLowerCase().includes('halloween lunch') }" @click="selectItem(item)">
           <div class="item-title">{{ item.title }}</div>
           <div class="item-time">{{ formatTime(item.time) }}</div>
         </li>
@@ -189,6 +187,11 @@ function formatTime(iso) {
 .empty {
   color: #888;
   font-style: italic;
+}
+
+.small-event {
+  font-size: 0.7em;
+  padding: 4px;
 }
 
 .details {

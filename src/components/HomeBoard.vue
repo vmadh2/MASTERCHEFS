@@ -25,25 +25,20 @@
   </header>
 
   <section class="hero is-light">
-    <div class="bubble-container" ref="bubbleContainer">
-      <div
-        v-for="bubble in bubbles"
-        :key="bubble.id"
-        class="bubble"
-        :style="{
-          left: bubble.x + 'px',
-          top: bubble.y + 'px',
-          width: bubble.size + 'px',
-          height: bubble.size + 'px',
-          backgroundColor: bubble.color,
-          animation: 'float 6s ease-in-out infinite',
-          animationDelay: bubble.delay + 's'
-        }"
-        @click="selectBubble(bubble)"
-      >
-        {{ bubble.event_title || bubble.id }}
+    <div class="content-container">
+      <ul class="list">
+        <li v-for="(item, index) in allItems" :key="item.id" class="list-item" :class="{ 'small-event': item.event_name && item.event_name.toLowerCase().includes('halloween lunch') }" :style="{ left: item.position.left, top: item.position.top }" @click="selectItem(item)">
+          <div class="item-title">{{ index === 1 ? item.event_name.toUpperCase() : item.event_name }}</div>
+          <div class="item-time">{{ index === 1 ? formatCustomTime(item.event_time) : formatTime(item.event_time) }}</div>
+        </li>
+        <li v-if="allItems.length === 0" class="empty">No items</li>
+      </ul>
+
+      <div v-if="selectedItem" class="details">
+        <h3>Details for {{ selectedItem.event_name }}</h3>
+        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
+        <button @click="selectedItem = null">Close</button>
       </div>
-      <div v-if="loading.bubbles" class="loading">Loading bubbles…</div>
     </div>
   </section>
   
@@ -95,176 +90,132 @@ export default {
   name: 'HomeBoard',
   data() {
     return {
-      // start empty; we'll load bubbles from the API
-      bubbles: [],
-      loading: { bubbles: false },
-      // reactive container dimensions
-      containerWidth: 0,
-      containerHeight: 0,
+      sections: [
+        { key: 'news', label: 'Food', items: [] },
+        { key: 'events', label: 'Sports', items: [] },
+        { key: 'articles', label: 'Hobby', items: [] },
+      ],
+      loading: { news: false, events: false, articles: false },
+      selectedItem: null,
     };
   },
-  methods: {
-    // Update container size when mounted or resized
-    updateContainerSize() {
-  const el = this.$refs.bubbleContainer;
-  if (el) {
-    const topBar = document.querySelector('.topbar');
-    const bottomBar = document.querySelector('.bottombar');
-    const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
-    const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
-
-    const availableHeight = window.innerHeight - topH - bottomH;
-    el.style.height = `${availableHeight}px`;
-    el.style.minHeight = '0'; // Prevent any minimum height from adding space
-    this.containerWidth = el.clientWidth || 0;
-    this.containerHeight = el.clientHeight || 0;
-      }
-    },
-
-    bubbleStyle(bubble) {
-      const w = this.containerWidth;
-      const h = this.containerHeight;
-      const size = bubble.size || 0;
-
-      const style = {
-        width: `${size}px`,
-        height: `${size}px`,
-        animationDelay: `${bubble.delay}s`,
-        lineHeight: `${size}px`,
-      };
-
-      if (w > 0 && h > 0) {
-        // clamp bubble size so it never exceeds container proportions
-        const maxAllowed = Math.min(w * 0.6, h * 0.6);
-        const sizeClamp = Math.min(size, Math.max(24, maxAllowed));
-
-        // desired position based on percentage values stored in bubble.x/y
-        let leftPx = (bubble.x / 100) * w;
-        let topPx = (bubble.y / 100) * h;
-
-        // account for float animation vertical movement so bubbles don't get pushed past the edge
-        const safetyMargin = 22; // px (accounts for animation and shadows)
-
-        // ensure bubble stays fully inside container (include safety margin)
-        const maxLeft = Math.max(0, w - sizeClamp);
-        const maxTop = Math.max(0, h - sizeClamp - safetyMargin);
-
-        leftPx = Math.max(0, Math.min(leftPx, maxLeft));
-        topPx = Math.max(0, Math.min(topPx, maxTop));
-
-        style.width = `${sizeClamp}px`;
-        style.height = `${sizeClamp}px`;
-        style.lineHeight = `${sizeClamp}px`;
-        style.left = `${leftPx}px`;
-        style.top = `${topPx}px`;
-        style.transform = 'none';
-      } else {
-        // fallback: percent positioning (should rarely happen)
-        style.left = `${bubble.x}%`;
-        style.top = `${bubble.y}%`;
-        style.transform = 'translate(-50%, -50%)';
-      }
-
-      return style;
-    }
-    ,
-
-    },
-
-    selectBubble(bubble) {
-      // Handle bubble selection, e.g., show details
-      console.log('Selected bubble:', bubble);
-    },
-
-    // Load bubbles from localStorage, fallback to fetch
-    loadBubbles() {
-      const stored = localStorage.getItem('bubbles');
-      if (stored) {
-        try {
-          this.bubbles = JSON.parse(stored);
-          this.$nextTick(() => this.updateContainerSize());
-        } catch (e) {
-          console.error('Failed to parse stored bubbles:', e);
-          this.fetchBubbles();
+  computed: {
+    allItems() {
+      // Get all items, shuffle them, and take only 5
+      const items = this.sections.flatMap(s => s.items);
+      const shuffled = items.sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 5).map(item => ({
+        ...item,
+        position: {
+          left: `${Math.random() * 80 + 10}%`, // Random position between 10% and 90%
+          top: `${Math.random() * 60 + 20}%`    // Random position between 20% and 80%
         }
-      } else {
-        this.fetchBubbles();
+      }));
+    }
+  },
+  methods: {
+    normalizeWhen(value) {
+      if (!value) return ''
+      if (typeof value === 'object') {
+        if (value._seconds) return new Date(value._seconds * 1000).toISOString()
+        if (typeof value.toDate === 'function') return value.toDate().toISOString()
+      }
+      if (typeof value === 'string') return value
+      try {
+        return new Date(value).toISOString()
+      } catch {
+        return ''
       }
     },
 
-// Fetch bubbles from server and map event_type to visual layout
-async fetchBubbles() {
-  this.loading.bubbles = true;
-  try {
-    const querySnapshot = await getDocs(collection(db, 'bubbles'));
-    const docs = [];
-    querySnapshot.forEach((doc) => {
-      const d = doc.data();
-      docs.push({
-        id: doc.id,
-        event_type: d.event_type || d.type || null,
-        bubble_created: d.bubble_created || d.timestamp || null,
-        event_title: d.event_title || d.eventName || d.title || d.name || null,
-        event_when: d.event_when || d.when || d.date || d.bubble_created || null,
-        x: typeof d.x === 'number' ? d.x : 0,
-        y: typeof d.y === 'number' ? d.y : 0,
-        size: d.size || 50,
-        color: d.color || '#8de3ea',
-        raw: d
-      });
-    });
+    formatTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      return d.toLocaleString()
+    },
 
-    // Simple, safe mapping to UI bubbles (avoids relying on undefined helpers)
-    this.bubbles = docs.map((doc, idx) => {
-      const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase();
-      let color = '#4794cf'; // default blue for leisure/hobby
-      if (type.includes('food')) color = '#39a551'; // green for food
-      else if (type.includes('sport')) color = '#d75966'; // red for activity/sport
+    formatCustomTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const year = d.getFullYear()
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      const seconds = String(d.getSeconds()).padStart(2, '0')
+      return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`
+    },
 
-      const title = doc.event_title || doc.raw?.title || doc.raw?.name || `Bubble ${idx + 1}`;
-      return {
-        id: doc.id,
-        text: title,
-        color: color,
-        x: typeof doc.x === 'number' ? doc.x : Math.round(10 + Math.random() * 80),
-        y: typeof doc.y === 'number' ? doc.y : Math.round(10 + Math.random() * 70),
-        size: doc.size || 70,
-        delay: (idx * 0.6) % 6,
-        raw: doc
-      };
-    });
+    async fetchBubbles() {
+      this.loading.news = this.loading.events = this.loading.articles = true
+      try {
+        const querySnapshot = await getDocs(collection(db, 'bubbles'))
+        const docs = []
+        querySnapshot.forEach((doc) => {
+          const d = doc.data()
+          docs.push({
+            id: doc.id,
+            event_type: d.event_type || d.type || null,
+            bubble_created: d.bubble_created || d.timestamp || null,
+            event_title: d.event_title || d.eventName || d.title || d.name || null,
+            event_when: d.event_when || d.when || d.date || d.bubble_created || null,
+            x: d.x || null,
+            y: d.y || null,
+            size: d.size || null,
+            color: d.color || null,
+            raw: d
+          })
+        })
 
-    // Store bubbles in localStorage
-    localStorage.setItem('bubbles', JSON.stringify(this.bubbles));
+        this.sections.forEach((s) => (s.items = []))
 
-    this.$nextTick(() => this.updateContainerSize());
-  } catch (err) {
-    console.error('Failed to load bubbles:', err);
-    // fallback small bubble so UI doesn't break
-    if (!this.bubbles || this.bubbles.length === 0) {
-      this.bubbles = [{ text: 'Offline', color: '#4794cf', x: 50, y: 60, size: 100, delay: 0 }];
+        docs.forEach((doc) => {
+          const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase()
+          const item = {
+            id: doc.id,
+            event_name:
+              doc.event_title || doc.title || doc.raw?.event_title || doc.raw?.title || doc.raw?.name || 'Unnamed Event',
+            event_time: this.normalizeWhen(
+              doc.event_when || doc.bubble_created || doc.raw?.event_when || doc.raw?.bubble_created
+            ),
+            fullData: doc
+          }
+
+          if (type.includes('food')) this.sections[0].items.push(item)
+          else if (type.includes('sport')) this.sections[1].items.push(item)
+          else this.sections[2].items.push(item)
+        })
+      } catch (err) {
+        console.error('Failed to fetch bubbles:', err)
+      } finally {
+        this.loading.news = this.loading.events = this.loading.articles = false
+      }
+    },
+
+    async loadSection(_key) {
+      await this.fetchBubbles()
+    },
+
+    async refreshSection(_key) {
+      await this.loadSection(_key)
+    },
+
+    selectItem(item) {
+      this.selectedItem = item
     }
-  } finally {
-    this.loading.bubbles = false;
-  }
-},
-
-
+  },
   mounted() {
-    // measure container after mount and on resize
-    this.$nextTick(() => {
-      this.updateContainerSize();
-      // load bubbles once layout is measured
-      this.loadBubbles();
-    });
-    this._resizeHandler = () => this.updateContainerSize();
-    window.addEventListener('resize', this._resizeHandler);
+    this.fetchBubbles()
   },
 
   beforeUnmount() {
-    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+    // No cleanup needed
   },
 };
+
+
 </script>
 
 <style scoped>
@@ -275,49 +226,6 @@ async fetchBubbles() {
   height: 100vh; /* Initial fallback */
   min-height: 0; /* Prevent min-height from adding space */
   margin: 0;
-}
-
-/* Ensure bubble-container fills the hero */
-.bubble-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%; /* Override any JS-set height if needed */
-  overflow: visible;
-  margin: 0;
-}
-
-/* Remove any default container stretching */
-.container.stretch {
-  height: 100%;
-  padding-top: 72px; /* Match topbar height to avoid overlap */
-  padding-bottom: 72px; /* Match bottombar height to avoid overlap */
-  margin: 0;
-}
-
-/* Ensure hero-body doesn't add extra space */
-.hero-body {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  height: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-/* remove the fixed container.stretch height to avoid double-calculation
-   the bubble-container will be sized by JS to the exact space between bars */
-.container.stretch { height: auto; }
-
-/* Keep bubble-container height set by JS */
-.bubble-container {
-  position: relative;
-  width: 100%;
-  overflow: visible; /* allow shadows to show and prevent clipping */
-  margin: 0 auto;
 }
 
 /* Top bar styles */
@@ -421,6 +329,113 @@ async fetchBubbles() {
 /* Make bubble-container fill available vertical space between bars */
 .hero.is-light { padding-top: 0; padding-bottom: 0; }
 
+.content-container {
+  padding: 16px;
+  box-sizing: border-box;
+  padding-top: 80px; /* below topbar */
+  padding-bottom: 80px; /* above bottombar */
+  position: relative;
+  height: calc(100vh - 144px); /* Full height minus top and bottom bars */
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.list-item {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transform: translate(-50%, -50%); /* Center the bubble on its position */
+  animation: float 6s ease-in-out infinite;
+}
+
+.list-item:nth-child(even) {
+  animation: float 8s ease-in-out infinite;
+}
+
+.list-item:nth-child(3n) {
+  animation: float 7s ease-in-out infinite;
+}
+
+.item-title {
+  font-weight: 600;
+  color: #111;
+  font-size: 0.9em;
+  line-height: 1.2;
+  padding: 0 8px;
+}
+
+.item-time {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 4px;
+}
+
+.empty {
+  color: #888;
+  font-style: italic;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.small-event {
+  font-size: 0.6em;
+  width: 120px;
+  height: 120px;
+}
+
+@keyframes float {
+  0% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-15px);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+}
+
+.details {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  padding: 16px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #fff;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.details pre {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
 /* Pastel Colors */
 .is-pastel-red {
   background-color: #d75966; /* Light Coral */
@@ -430,23 +445,5 @@ async fetchBubbles() {
 }
 .is-pastel-blue {
   background-color: #39a551; /* Light Green */
-}
-
-
-/* Keyframe animation for floating */
-@keyframes float {
-  0% { transform: translate(0,  0px); }
-  50% { transform: translate(0, 15px); } /* Adjust vertical float distance */
-  100% { transform: translate(0,  0px); }
-}
-
-/* Optional: Add a slight horizontal movement for more randomness */
-.bubble:nth-child(even) {
-    animation: float-h 12s ease-in-out infinite;
-}
-@keyframes float-h {
-  0% { transform: translate(0px,  0); }
-  50% { transform: translate(15px, 0); }
-  100% { transform: translate(0px,  0); }
 }
 </style>
