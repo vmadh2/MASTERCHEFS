@@ -12,25 +12,32 @@
       >
       Post
       </router-link>
+      <router-link
+        :to="{ name: 'test' }"
+        class="test-btn"
+        role="button"
+        aria-label="Open test page"
+        style="display:flex;align-items:center;justify-content:center"
+      >
+      Test
+      </router-link>
     </div>
   </header>
 
   <section class="hero is-light">
-    <div class="hero-body is-align-items-center">
-      <div class="container has-text-centered stretch" style="width:100%;">
+    <div class="content-container">
+      <ul class="list">
+        <li v-for="(item, index) in allItems" :key="item.id" class="list-item" :class="{ 'small-event': item.event_name && item.event_name.toLowerCase().includes('halloween lunch') }" :style="{ left: item.position.left, top: item.position.top }" @click="selectItem(item)">
+          <div class="item-title">{{ index === 1 ? item.event_name.toUpperCase() : item.event_name }}</div>
+          <div class="item-time">{{ index === 1 ? formatCustomTime(item.event_time) : formatTime(item.event_time) }}</div>
+        </li>
+        <li v-if="allItems.length === 0" class="empty">No items</li>
+      </ul>
 
-
-  <div class="bubble-container" ref="bubbleContainer">
-          <div
-            v-for="(bubble, index) in bubbles"
-            :key="index"
-            class="bubble"
-            :class="bubble.colorClass"
-            :style="bubbleStyle(bubble)"
-          >
-            <p>{{ bubble.text }}</p>
-          </div>
-        </div>
+      <div v-if="selectedItem" class="details">
+        <h3>Details for {{ selectedItem.event_name }}</h3>
+        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
+        <button @click="selectedItem = null">Close</button>
       </div>
     </div>
   </section>
@@ -80,149 +87,149 @@
 </template>
 
 <script>
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '../firebase.js'
+
 export default {
   name: 'HomeBoard',
   data() {
     return {
-      bubbles: [
-        { text: 'Hotpot', colorClass: 'is-pastel-red', x: 10, y: 20, size: 100, delay: 0 },
-        { text: 'Soccer', colorClass: 'is-pastel-green', x: 70, y: 10, size: 120, delay: 2 },
-        { text: 'Charger', colorClass: 'is-pastel-blue', x: 30, y: 50, size: 105, delay: 1 },
-        { text: 'NFL', colorClass: 'is-pastel-green', x: 55, y: 30, size: 110, delay: 3 },
-        { text: 'Coffee', colorClass: 'is-pastel-red', x: 15, y: 70, size: 130, delay: 4 },
-        { text: 'Pen', colorClass: 'is-pastel-blue', x: 80, y: 60, size: 100, delay: 2.5 },
-        { text: 'table-tennis', colorClass: 'is-pastel-green', x: 70, y: 80, size: 115, delay: 1.5 },
-        { text: 'Excel', colorClass: 'is-pastel-green', x: 40, y: 80, size: 200, delay: 1.5 },
+      sections: [
+        { key: 'news', label: 'Food', items: [] },
+        { key: 'events', label: 'Sports', items: [] },
+        { key: 'articles', label: 'Hobby', items: [] },
       ],
-      // reactive container dimensions
-      containerWidth: 0,
-      containerHeight: 0,
+      loading: { news: false, events: false, articles: false },
+      selectedItem: null,
     };
   },
+  computed: {
+    allItems() {
+      // Get all items, shuffle them, and take only 5
+      const items = this.sections.flatMap(s => s.items);
+      const shuffled = items.sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 5).map(item => ({
+        ...item,
+        position: {
+          left: `${Math.random() * 80 + 10}%`, // Random position between 10% and 90%
+          top: `${Math.random() * 60 + 20}%`    // Random position between 20% and 80%
+        }
+      }));
+    }
+  },
   methods: {
-    // Update container size when mounted or resized
-    updateContainerSize() {
-      const el = this.$refs.bubbleContainer;
-      if (el) {
-        // measure fixed bars (use actual DOM heights if available)
-        const topBar = document.querySelector('.topbar');
-        const bottomBar = document.querySelector('.bottombar');
-        const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
-        const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
-
-        // available space strictly between the bars
-        const availableHeight = Math.max(120, window.innerHeight - topH - bottomH);
-
-        // explicitly set the bubble container height so positioning math matches visible space
-        el.style.height = `${availableHeight}px`;
-
-        // then read the actual client sizes (after setting height)
-        this.containerWidth = el.clientWidth || 0;
-        this.containerHeight = el.clientHeight || 0;
+    normalizeWhen(value) {
+      if (!value) return ''
+      if (typeof value === 'object') {
+        if (value._seconds) return new Date(value._seconds * 1000).toISOString()
+        if (typeof value.toDate === 'function') return value.toDate().toISOString()
+      }
+      if (typeof value === 'string') return value
+      try {
+        return new Date(value).toISOString()
+      } catch {
+        return ''
       }
     },
 
-    bubbleStyle(bubble) {
-      const w = this.containerWidth;
-      const h = this.containerHeight;
-      const size = bubble.size || 0;
+    formatTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      return d.toLocaleString()
+    },
 
-      const style = {
-        width: `${size}px`,
-        height: `${size}px`,
-        animationDelay: `${bubble.delay}s`,
-        lineHeight: `${size}px`,
-      };
+    formatCustomTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const year = d.getFullYear()
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      const seconds = String(d.getSeconds()).padStart(2, '0')
+      return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`
+    },
 
-      if (w > 0 && h > 0) {
-        // clamp bubble size so it never exceeds container proportions
-        const maxAllowed = Math.min(w * 0.6, h * 0.6);
-        const sizeClamp = Math.min(size, Math.max(24, maxAllowed));
+    async fetchBubbles() {
+      this.loading.news = this.loading.events = this.loading.articles = true
+      try {
+        const querySnapshot = await getDocs(collection(db, 'bubbles'))
+        const docs = []
+        querySnapshot.forEach((doc) => {
+          const d = doc.data()
+          docs.push({
+            id: doc.id,
+            event_type: d.event_type || d.type || null,
+            bubble_created: d.bubble_created || d.timestamp || null,
+            event_title: d.event_title || d.eventName || d.title || d.name || null,
+            event_when: d.event_when || d.when || d.date || d.bubble_created || null,
+            x: d.x || null,
+            y: d.y || null,
+            size: d.size || null,
+            color: d.color || null,
+            raw: d
+          })
+        })
 
-        // desired position based on percentage values stored in bubble.x/y
-        let leftPx = (bubble.x / 100) * w;
-        let topPx = (bubble.y / 100) * h;
+        this.sections.forEach((s) => (s.items = []))
 
-        // account for float animation vertical movement so bubbles don't get pushed past the edge
-        const safetyMargin = 22; // px (accounts for animation and shadows)
+        docs.forEach((doc) => {
+          const type = (doc.event_type || doc.raw?.event_type || 'misc').toString().toLowerCase()
+          const item = {
+            id: doc.id,
+            event_name:
+              doc.event_title || doc.title || doc.raw?.event_title || doc.raw?.title || doc.raw?.name || 'Unnamed Event',
+            event_time: this.normalizeWhen(
+              doc.event_when || doc.bubble_created || doc.raw?.event_when || doc.raw?.bubble_created
+            ),
+            fullData: doc
+          }
 
-        // ensure bubble stays fully inside container (include safety margin)
-        const maxLeft = Math.max(0, w - sizeClamp);
-        const maxTop = Math.max(0, h - sizeClamp - safetyMargin);
-
-        leftPx = Math.max(0, Math.min(leftPx, maxLeft));
-        topPx = Math.max(0, Math.min(topPx, maxTop));
-
-        style.width = `${sizeClamp}px`;
-        style.height = `${sizeClamp}px`;
-        style.lineHeight = `${sizeClamp}px`;
-        style.left = `${leftPx}px`;
-        style.top = `${topPx}px`;
-        style.transform = 'none';
-      } else {
-        // fallback: percent positioning (should rarely happen)
-        style.left = `${bubble.x}%`;
-        style.top = `${bubble.y}%`;
-        style.transform = 'translate(-50%, -50%)';
+          if (type.includes('food')) this.sections[0].items.push(item)
+          else if (type.includes('sport')) this.sections[1].items.push(item)
+          else this.sections[2].items.push(item)
+        })
+      } catch (err) {
+        console.error('Failed to fetch bubbles:', err)
+      } finally {
+        this.loading.news = this.loading.events = this.loading.articles = false
       }
+    },
 
-      return style;
+    async loadSection(_key) {
+      await this.fetchBubbles()
+    },
+
+    async refreshSection(_key) {
+      await this.loadSection(_key)
+    },
+
+    selectItem(item) {
+      this.selectedItem = item
     }
   },
-
   mounted() {
-    // measure container after mount and on resize
-    this.$nextTick(() => this.updateContainerSize());
-    this._resizeHandler = () => this.updateContainerSize();
-    window.addEventListener('resize', this._resizeHandler);
+    this.fetchBubbles()
   },
 
   beforeUnmount() {
-    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+    // No cleanup needed
   },
 };
+
+
 </script>
 
 <style scoped>
-.bubble-container {
-  position: relative;
-  width: 100%;
-  overflow: visible; /* allow shadows to show and prevent clipping */
-  margin: 0 auto;
-}
-
-.bubble {
-  position: absolute;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: white; /* Or a darker shade for contrast */
-  font-weight: bold;
-  font-size: 1.2em;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  animation: float 10s ease-in-out infinite; /* Main floating animation */
-  will-change: transform;
-}
-
-/* Ensure the hero-body centers its content vertically */
-.hero-body {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-}
-
-/* remove the fixed container.stretch height to avoid double-calculation
-   the bubble-container will be sized by JS to the exact space between bars */
-.container.stretch { height: auto; }
-
-/* Keep bubble-container height set by JS */
-.bubble-container {
-  position: relative;
-  width: 100%;
-  overflow: visible; /* allow shadows to show and prevent clipping */
-  margin: 0 auto;
+/* Ensure hero takes full height minus bars */
+.hero.is-light {
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 100vh; /* Initial fallback */
+  min-height: 0; /* Prevent min-height from adding space */
+  margin: 0;
 }
 
 /* Top bar styles */
@@ -264,6 +271,22 @@ export default {
   cursor: pointer;
 }
 .login-btn:active { transform: translateY(1px); }
+
+.test-btn {
+  position: absolute;
+  right: 96px; /* sits left of the Post button which is 18px from right */
+  top: 12px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: #ffd166; /* warm yellow */
+  color: #073642;
+  font-weight: 700;
+  border: none;
+  box-shadow: 4px 6px 8px rgba(0,0,0,0.12);
+  cursor: pointer;
+}
+.test-btn:active { transform: translateY(1px); }
 
 /* Ensure page content appears below the fixed topbar */
 .container { padding-top: 1rem; }
@@ -310,6 +333,113 @@ export default {
 /* Make bubble-container fill available vertical space between bars */
 .hero.is-light { padding-top: 0; padding-bottom: 0; }
 
+.content-container {
+  padding: 16px;
+  box-sizing: border-box;
+  padding-top: 80px; /* below topbar */
+  padding-bottom: 80px; /* above bottombar */
+  position: relative;
+  height: calc(100vh - 144px); /* Full height minus top and bottom bars */
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.list-item {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transform: translate(-50%, -50%); /* Center the bubble on its position */
+  animation: float 6s ease-in-out infinite;
+}
+
+.list-item:nth-child(even) {
+  animation: float 8s ease-in-out infinite;
+}
+
+.list-item:nth-child(3n) {
+  animation: float 7s ease-in-out infinite;
+}
+
+.item-title {
+  font-weight: 600;
+  color: #111;
+  font-size: 0.9em;
+  line-height: 1.2;
+  padding: 0 8px;
+}
+
+.item-time {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 4px;
+}
+
+.empty {
+  color: #888;
+  font-style: italic;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.small-event {
+  font-size: 0.6em;
+  width: 120px;
+  height: 120px;
+}
+
+@keyframes float {
+  0% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-15px);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+}
+
+.details {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  padding: 16px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #fff;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.details pre {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
 /* Pastel Colors */
 .is-pastel-red {
   background-color: #d75966; /* Light Coral */
@@ -319,23 +449,5 @@ export default {
 }
 .is-pastel-blue {
   background-color: #39a551; /* Light Green */
-}
-
-
-/* Keyframe animation for floating */
-@keyframes float {
-  0% { transform: translate(0,  0px); }
-  50% { transform: translate(0, 15px); } /* Adjust vertical float distance */
-  100% { transform: translate(0,  0px); }
-}
-
-/* Optional: Add a slight horizontal movement for more randomness */
-.bubble:nth-child(even) {
-    animation: float-h 12s ease-in-out infinite;
-}
-@keyframes float-h {
-  0% { transform: translate(0px,  0); }
-  50% { transform: translate(15px, 0); }
-  100% { transform: translate(0px,  0); }
 }
 </style>

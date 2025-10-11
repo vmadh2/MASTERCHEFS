@@ -32,7 +32,7 @@
         <!-- added: Back to Home button (left) -->
         <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
 
-        <button type="button" class="post-btn" @click="sendData().then(() => $router.push('/homeboard')).catch(() => {})">Post</button>
+        <router-link :to="{ name: 'home-board' }" class="post-btn" role="button" aria-label="Post" @click.native.prevent="sendData().then(() => $router.push({ name: 'home-board' })).catch(() => {})">Post</router-link>
       </form>
     </div>
   </div>
