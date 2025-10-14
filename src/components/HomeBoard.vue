@@ -12,7 +12,7 @@
       >
       Post
       </router-link>
-      <router-link
+      <!-- <router-link
         :to="{ name: 'test' }"
         class="test-btn"
         role="button"
@@ -20,7 +20,7 @@
         style="display:flex;align-items:center;justify-content:center"
       >
       Test
-      </router-link>
+      </router-link> -->
     </div>
   </header>
 
@@ -108,13 +108,32 @@ export default {
       // Get all items, shuffle them, and take only 5
       const items = this.sections.flatMap(s => s.items);
       const shuffled = items.sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, 5).map(item => ({
-        ...item,
-        position: {
-          left: `${Math.random() * 80 + 10}%`, // Random position between 10% and 90%
-          top: `${Math.random() * 60 + 20}%`    // Random position between 20% and 80%
-        }
-      }));
+      const selectedItems = shuffled.slice(0, 5);
+
+      // Generate non-overlapping positions
+      const positions = [];
+      selectedItems.forEach(item => {
+        let pos;
+        let attempts = 0;
+        do {
+          pos = {
+            left: Math.random() * 70 + 15, // 15% to 85%
+            top: Math.random() * 40 + 30   // 30% to 70%
+          };
+          attempts++;
+        } while (positions.some(p => {
+          const dx = p.left - pos.left;
+          const dy = p.top - pos.top;
+          return Math.sqrt(dx * dx + dy * dy) < 20; // Min 20% distance
+        }) && attempts < 50);
+        positions.push(pos);
+        item.position = {
+          left: `${pos.left}%`,
+          top: `${pos.top}%`
+        };
+      });
+
+      return selectedItems;
     }
   },
   methods: {
@@ -230,6 +249,7 @@ export default {
   height: 100vh; /* Initial fallback */
   min-height: 0; /* Prevent min-height from adding space */
   margin: 0;
+  position: relative;
 }
 
 /* Top bar styles */
@@ -336,10 +356,11 @@ export default {
 .content-container {
   padding: 16px;
   box-sizing: border-box;
-  padding-top: 80px; /* below topbar */
-  padding-bottom: 80px; /* above bottombar */
-  position: relative;
-  height: calc(100vh - 144px); /* Full height minus top and bottom bars */
+  position: absolute;
+  top: 72px;
+  bottom: 72px;
+  left: 0;
+  right: 0;
 }
 
 .list {
@@ -349,6 +370,7 @@ export default {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 .list-item {
@@ -410,7 +432,7 @@ export default {
     transform: translate(-50%, -50%) translateY(0px);
   }
   50% {
-    transform: translate(-50%, -50%) translateY(-15px);
+    transform: translate(-50%, -50%) translateY(-10px);
   }
   100% {
     transform: translate(-50%, -50%) translateY(0px);

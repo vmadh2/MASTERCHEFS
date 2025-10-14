@@ -39,8 +39,8 @@
 </template>
 
 <script>
-import { addDoc, Timestamp } from 'firebase/firestore';
-import { bubblesCollection } from '@/main.js'; // Adjust the path if main.js is not in src/
+import { addDoc, Timestamp, collection } from 'firebase/firestore';
+import { db } from '../firebase.js';
 
 export default {
   data() {
@@ -80,7 +80,7 @@ export default {
         };
 
         // --- Use imported addDoc and bubblesCollection ---
-        await addDoc(bubblesCollection, newPost);
+        await addDoc(collection(db, 'bubbles'), newPost);
 
         alert('Data sent to Firebase Firestore!');
 
