@@ -12,18 +12,87 @@
     </div>
   </header>
 
+  <!-- Speed Detection Notification -->
+  <div v-if="speedNotification" class="speed-notification" :class="{ 'show': speedNotification }">
+    <div class="notification-content">
+      <h3>🚶‍♂️ Speed Detected!</h3>
+      <p>Speed: {{ lastDetectedSpeed }} km/h</p>
+      <p>Showing {{ currentBubbleCount }} bubbles</p>
+      <div class="notification-timer">Resetting in {{ resetCountdown }}s</div>
+    </div>
+  </div>
+
   <section class="hero is-light">
     <!-- The ref on this container is crucial for measuring dimensions -->
     <div class="content-container" ref="contentContainer">
       <ul class="list">
-        <!-- Loop over the 'positionedItems' data property -->
-        <li v-for="item in positionedItems" :key="item.id" class="list-item" :class="item.colorClass"
-          :style="item.position" @click="selectItem(item)">
+        <!-- Loop over the 'positionedItems' data property with dynamic sizes -->
+        <li v-for="item in positionedItems" :key="item.id" 
+            class="list-item" 
+            :class="item.colorClass"
+            :style="{ ...item.position, ...item.dynamicStyle }" 
+            @click="selectItem(item)">
           <div class="item-title">{{ item.event_name }}</div>
           <div class="item-time">{{ formatTime(item.event_time) }}</div>
+          
+          <!-- Like Heart Button -->
+          <button 
+            class="like-btn" 
+            :class="{ 'liked': isLiked(item.id) }"
+            @click.stop="toggleLike(item)"
+            :title="isLiked(item.id) ? 'Unlike' : 'Like'"
+          >
+            {{ isLiked(item.id) ? '❤️' : '🤍' }}
+          </button>
         </li>
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
       </ul>
+
+      <!-- Liked Items Counter -->
+      <div class="liked-counter">
+        <span>❤️ {{ likedBubbles.size }} bubbles liked</span>
+        <button @click="showLikedBubbles" class="view-liked-btn">View Liked</button>
+      </div>
+
+      <!-- Debug Info (can be removed later) -->
+      <div class="debug-info">
+        <p>Listening for speed data: {{ speedListener ? 'Active' : 'Inactive' }}</p>
+        <p>Current bubble limit: {{ bubbleLimit || 'Default (5)' }}</p>
+        <p>Last speed timestamp: {{ lastSpeedTimestamp ? new Date(lastSpeedTimestamp).toLocaleTimeString() : 'None' }}</p>
+        <p>Liked bubbles: {{ Array.from(likedBubbles).join(', ') }}</p>
+      </div>
+
+      <!-- Test Button -->
+      <button @click="testSpeedConnection" class="test-speed-btn">
+        Test Speed Connection
+      </button>
+
+      <!-- Liked Bubbles Modal -->
+      <div v-if="showLikedModal" class="liked-modal" @click.self="showLikedModal = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>❤️ Liked Bubbles ({{ likedBubblesData.length }})</h3>
+            <button @click="showLikedModal = false" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="likedBubblesData.length === 0" class="no-liked">
+              No bubbles liked yet!
+            </div>
+            <div v-else class="liked-list">
+              <div v-for="bubble in likedBubblesData" :key="bubble.id" class="liked-item" :class="bubble.colorClass">
+                <div class="liked-item-content">
+                  <h4>{{ bubble.event_name }}</h4>
+                  <p>{{ formatTime(bubble.event_time) }}</p>
+                </div>
+                <button @click="toggleLike(bubble)" class="unlike-btn">❤️</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="clearAllLikes" class="clear-all-btn">Clear All</button>
+          </div>
+        </div>
+      </div>
 
       <div v-if="selectedItem" class="details">
         <h3>Details for {{ selectedItem.event_name }}</h3>
@@ -48,7 +117,7 @@
 </template>
 
 <script>
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot, query, orderBy, limit } from 'firebase/firestore'
 // Make sure this path is correct for your project structure
 import { db } from '../firebase.js'
 
@@ -64,9 +133,135 @@ export default {
       positionedItems: [],
       loading: { fetchAll: false },
       selectedItem: null,
+      // Speed detection properties
+      bubbleLimit: null, // null means show default bubbles (5)
+      resetTimer: null,
+      lastSpeedTimestamp: null,
+      speedListener: null,
+      speedNotification: false,
+      lastDetectedSpeed: 0,
+      currentBubbleCount: 5,
+      resetCountdown: 0,
+      countdownTimer: null,
+      // Liking functionality
+      likedBubbles: new Set(), // Store liked bubble IDs
+      showLikedModal: false,
+      allBubblesData: [] // Store all bubble data for liked modal
     };
   },
+  computed: {
+    likedBubblesData() {
+      // Return full data for liked bubbles
+      return this.allBubblesData.filter(bubble => this.likedBubbles.has(bubble.id));
+    }
+  },
   methods: {
+    // --- LIKING FUNCTIONALITY ---
+    toggleLike(item) {
+      console.log('Toggle like for:', item.id, item.event_name);
+      
+      if (this.likedBubbles.has(item.id)) {
+        // Unlike
+        this.likedBubbles.delete(item.id);
+        console.log('Unliked:', item.event_name);
+      } else {
+        // Like
+        this.likedBubbles.add(item.id);
+        console.log('Liked:', item.event_name);
+      }
+      
+      // Save to localStorage
+      this.saveLikesToStorage();
+      
+      // Force reactivity update
+      this.$forceUpdate();
+    },
+
+    isLiked(bubbleId) {
+      return this.likedBubbles.has(bubbleId);
+    },
+
+    saveLikesToStorage() {
+      try {
+        const likesArray = Array.from(this.likedBubbles);
+        localStorage.setItem('likedBubbles', JSON.stringify(likesArray));
+        console.log('Saved likes to localStorage:', likesArray);
+      } catch (error) {
+        console.error('Error saving likes to localStorage:', error);
+      }
+    },
+
+    loadLikesFromStorage() {
+      try {
+        const saved = localStorage.getItem('likedBubbles');
+        if (saved) {
+          const likesArray = JSON.parse(saved);
+          this.likedBubbles = new Set(likesArray);
+          console.log('Loaded likes from localStorage:', likesArray);
+        }
+      } catch (error) {
+        console.error('Error loading likes from localStorage:', error);
+        this.likedBubbles = new Set(); // Reset to empty set on error
+      }
+    },
+
+    showLikedBubbles() {
+      this.showLikedModal = true;
+    },
+
+    clearAllLikes() {
+      if (confirm('Are you sure you want to clear all liked bubbles?')) {
+        this.likedBubbles.clear();
+        this.saveLikesToStorage();
+        this.$forceUpdate();
+        console.log('Cleared all likes');
+      }
+    },
+
+    // --- NEW: BUBBLE SIZE CALCULATION BASED ON TIME DELTA ---
+    calculateBubbleSize(item) {
+      try {
+        const now = new Date();
+        const createdAt = new Date(item.bubble_created || item.event_time);
+        const eventTime = new Date(item.event_when || item.event_time);
+        
+        // Calculate time delta in hours
+        const totalDeltaMs = Math.abs(eventTime.getTime() - createdAt.getTime());
+        const remainingDeltaMs = Math.abs(eventTime.getTime() - now.getTime());
+        
+        // If event has passed, use a default smaller size
+        if (now > eventTime) {
+          console.log(`Event ${item.event_name} has passed, using minimum size`);
+          return 200; // Minimum size for past events
+        }
+        
+        // Calculate urgency ratio (0 = just created, 1 = about to happen)
+        const urgencyRatio = totalDeltaMs > 0 ? 
+          Math.max(0, Math.min(1, 1 - (remainingDeltaMs / totalDeltaMs))) : 0;
+        
+        // Size range: 120px (far from event) to 200px (close to event)
+        const minSize = 120;
+        const maxSize = 200;
+        const calculatedSize = minSize + (urgencyRatio * (maxSize - minSize));
+        
+        console.log(`Bubble ${item.event_name}:`, {
+          createdAt: createdAt.toLocaleString(),
+          eventTime: eventTime.toLocaleString(),
+          now: now.toLocaleString(),
+          totalDeltaHours: (totalDeltaMs / (1000 * 60 * 60)).toFixed(2),
+          remainingDeltaHours: (remainingDeltaMs / (1000 * 60 * 60)).toFixed(2),
+          urgencyRatio: urgencyRatio.toFixed(3),
+          size: Math.round(calculatedSize)
+        });
+        
+        return Math.round(calculatedSize);
+        
+      } catch (error) {
+        console.error('Error calculating bubble size for', item.event_name, error);
+        return 150; // Default fallback size
+      }
+    },
+
     // --- DATA FETCHING & PROCESSING ---
     async fetchBubbles() {
       if (this.loading.fetchAll) return;
@@ -74,6 +269,7 @@ export default {
       try {
         const querySnapshot = await getDocs(collection(db, 'bubbles'));
         this.sections.forEach((s) => (s.items = [])); // Reset sections
+        this.allBubblesData = []; // Reset all bubbles data
 
         querySnapshot.forEach((doc) => {
           const d = doc.data();
@@ -83,9 +279,14 @@ export default {
             id: doc.id,
             event_name: d.event_title || 'Unnamed Event',
             event_time: this.normalizeWhen(d.event_when || d.bubble_created),
+            event_when: this.normalizeWhen(d.event_when), // Keep original event time
+            bubble_created: this.normalizeWhen(d.bubble_created), // Keep creation time
             fullData: d,
             colorClass: this.getColorForType(type)
           };
+
+          // Add to allBubblesData for liked modal
+          this.allBubblesData.push(item);
 
           if (type.includes('favour')) this.sections[0].items.push(item);
           else if (type.includes('question')) this.sections[1].items.push(item);
@@ -100,7 +301,164 @@ export default {
       }
     },
 
-    // --- LAYOUT & COLLISION AVOIDANCE ---
+    // --- SPEED DETECTION FUNCTIONALITY ---
+    setupSpeedListener() {
+      console.log('Setting up speed listener...');
+      
+      try {
+        const speedQuery = query(
+          collection(db, 'speed_passes'),
+          orderBy('created_at', 'desc'),
+          limit(1)
+        );
+
+        console.log('📡 Created query, setting up listener...');
+
+        this.speedListener = onSnapshot(speedQuery, 
+          (snapshot) => {
+            console.log('📡 Speed snapshot received');
+            console.log('Total docs in snapshot:', snapshot.size);
+            console.log('Document changes:', snapshot.docChanges().length);
+            console.log('Snapshot empty?', snapshot.empty);
+            
+            if (snapshot.empty) {
+              console.log('⚠️ Snapshot is empty - no documents found');
+              return;
+            }
+            
+            snapshot.docs.forEach((doc, index) => {
+              console.log(`Doc ${index}:`, doc.id, doc.data());
+            });
+            
+            snapshot.docChanges().forEach((change) => {
+              console.log('🔄 Change detected:', {
+                type: change.type,
+                docId: change.doc.id,
+                data: change.doc.data()
+              });
+              
+              if (change.type === 'added') {
+                const data = change.doc.data();
+                console.log('🎯 SPEED DATA DETECTED (showing regardless of timestamp):', data);
+                
+                // Always handle the speed data - no timestamp checking
+                this.handleSpeedData(data);
+                
+                // Update timestamp for reference
+                const timestamp = data.created_at;
+                if (timestamp) {
+                  this.lastSpeedTimestamp = timestamp.toMillis ? timestamp.toMillis() : Date.now();
+                  console.log('Updated lastSpeedTimestamp:', new Date(this.lastSpeedTimestamp));
+                }
+              }
+            });
+          }, 
+          (error) => {
+            console.error('❌ Speed listener error:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+          }
+        );
+        
+        console.log('✅ Speed listener setup complete');
+        
+      } catch (error) {
+        console.error('❌ Error setting up speed listener:', error);
+      }
+    },
+
+    handleSpeedData(speedData) {
+      const speedKph = speedData.speed_kph || 0;
+      
+      // Determine bubble count based on speed ranges
+      let bubbleCount;
+      if (speedKph >= 20) {
+        // Very fast: show only 2 bubbles
+        bubbleCount = 2;
+      } else if (speedKph >= 10) {
+        // Medium speed: show 4 bubbles
+        bubbleCount = 4;
+      } else {
+        // Slow speed: show all bubbles (default 5)
+        bubbleCount = 5;
+      }
+
+      console.log(`🚀 Speed: ${speedKph} km/h, showing ${bubbleCount} bubbles`);
+      
+      // Update notification data
+      this.lastDetectedSpeed = speedKph.toFixed(2);
+      this.currentBubbleCount = bubbleCount;
+      this.speedNotification = true;
+      
+      // Set the bubble limit
+      this.bubbleLimit = bubbleCount;
+      
+      // Regenerate layout with new bubble count
+      this.generateNonOverlappingLayout();
+      
+      // Clear any existing timers
+      if (this.resetTimer) {
+        clearTimeout(this.resetTimer);
+      }
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer);
+      }
+      
+      // Start countdown
+      this.resetCountdown = 5;
+      this.countdownTimer = setInterval(() => {
+        this.resetCountdown--;
+        if (this.resetCountdown <= 0) {
+          clearInterval(this.countdownTimer);
+        }
+      }, 1000);
+      
+      // Reset to normal state after 5 seconds
+      this.resetTimer = setTimeout(() => {
+        this.bubbleLimit = null; // Reset to show default number of bubbles
+        this.speedNotification = false;
+        this.resetCountdown = 0;
+        this.generateNonOverlappingLayout(); // Regenerate with default bubble count
+        console.log('✅ Reset to normal bubble display');
+      }, 5000);
+    },
+
+    async testSpeedConnection() {
+      console.log('🔍 Testing direct connection to speed_passes collection...');
+      try {
+        const speedSnapshot = await getDocs(collection(db, 'speed_passes'));
+        console.log('📊 Total speed documents found:', speedSnapshot.size);
+        
+        speedSnapshot.forEach((doc) => {
+          console.log('📄 Speed doc:', doc.id, doc.data());
+        });
+
+        if (speedSnapshot.size > 0) {
+          // Get the most recent document manually
+          const speedQuery = query(
+            collection(db, 'speed_passes'),
+            orderBy('created_at', 'desc'),
+            limit(1)
+          );
+          
+          const querySnapshot = await getDocs(speedQuery);
+          if (!querySnapshot.empty) {
+            const mostRecentDoc = querySnapshot.docs[0];
+            console.log('🏆 Most recent speed doc:', mostRecentDoc.id, mostRecentDoc.data());
+            
+            // Manually trigger speed detection with this data
+            this.handleSpeedData(mostRecentDoc.data());
+          }
+        } else {
+          console.log('❌ No documents found in speed_passes collection');
+        }
+        
+      } catch (error) {
+        console.error('❌ Error testing speed connection:', error);
+      }
+    },
+
+    // --- FIXED LAYOUT & COLLISION AVOIDANCE ---
     generateNonOverlappingLayout() {
       const container = this.$refs.contentContainer;
       if (!container) return;
@@ -109,14 +467,18 @@ export default {
       const containerHeight = container.clientHeight;
       const allItems = this.sections.flatMap(s => s.items);
       const shuffled = allItems.sort(() => 0.5 - Math.random());
-      const itemsToPlace = shuffled.slice(0, 5);
+      
+      // Use bubble limit if set by speed detection, otherwise default to 5
+      const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : 5;
+      const itemsToPlace = shuffled.slice(0, itemsToShow);
 
       const placedBubbles = [];
-      // --- UPDATED: A single, consistent diameter for all bubbles ---
-      const BUBBLE_DIAMETER = 150;
 
       itemsToPlace.forEach(item => {
-        const position = this.findValidPosition(placedBubbles, BUBBLE_DIAMETER, containerWidth, containerHeight);
+        // Calculate dynamic size based on time delta
+        const bubbleSize = this.calculateBubbleSize(item);
+        
+        const position = this.findValidPosition(placedBubbles, bubbleSize, containerWidth, containerHeight);
 
         if (position) {
           placedBubbles.push({
@@ -125,12 +487,18 @@ export default {
               left: `${(position.x / containerWidth) * 100}%`,
               top: `${(position.y / containerHeight) * 100}%`,
             },
+            dynamicStyle: {
+              width: `${bubbleSize}px`,
+              height: `${bubbleSize}px`,
+            },
             px: position.x,
             py: position.y,
-            diameter: BUBBLE_DIAMETER
+            diameter: bubbleSize
           });
         }
       });
+      
+      // CRITICAL: Actually set the positioned items
       this.positionedItems = placedBubbles;
     },
 
@@ -157,6 +525,7 @@ export default {
         }
         if (!hasOverlap) return { x, y };
       }
+      
       // Fallback if no valid position is found
       return {
         x: Math.random() * (containerWidth - diameter) + radius,
@@ -185,27 +554,334 @@ export default {
       }
     },
 
-    formatTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
-    },
-
     selectItem(item) {
       this.selectedItem = item;
+      console.log('Selected item:', item);
+    },
+
+    formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return date.toLocaleString(); // Adjust format as needed
     }
   },
+
+  // --- LIFECYCLE HOOKS ---
   mounted() {
+    console.log('🚀 HomeBoard mounted, fetching bubbles...');
+    
+    // Load likes from localStorage first
+    this.loadLikesFromStorage();
+    
     this.fetchBubbles();
     window.addEventListener('resize', this.generateNonOverlappingLayout);
+    
+    // Set up speed monitoring after initial load
+    console.log('Setting up speed listener in 2 seconds...');
+    setTimeout(() => {
+      this.setupSpeedListener();
+    }, 2000);
   },
+
   beforeUnmount() {
+    console.log('HomeBoard unmounting, cleaning up...');
     window.removeEventListener('resize', this.generateNonOverlappingLayout);
-  },
+    
+    // Clean up listeners and timers
+    if (this.speedListener) {
+      this.speedListener();
+    }
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+    }
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+    }
+  }
 };
 </script>
 
 <style scoped>
+/* Speed Notification Styles */
+.speed-notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: #2d3748;
+  color: white;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  z-index: 2000;
+  text-align: center;
+  min-width: 300px;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.speed-notification.show {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.notification-content h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.4em;
+  color: #4fd1c7;
+}
+
+.notification-content p {
+  margin: 8px 0;
+  font-size: 1.1em;
+}
+
+.notification-timer {
+  margin-top: 16px;
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  font-size: 0.9em;
+  color: #a0aec0;
+}
+
+/* Like Button Styles */
+.like-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.like-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.like-btn.liked {
+  background: rgba(255, 255, 255, 1);
+  animation: heartBeat 0.6s ease;
+}
+
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(1); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Liked Counter Styles */
+.liked-counter {
+  position: fixed;
+  bottom: 90px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 16px;
+  border-radius: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1500;
+}
+
+.liked-counter span {
+  font-weight: 600;
+  color: #333;
+}
+
+.view-liked-btn {
+  background: #ff6b9d;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.3s ease;
+}
+
+.view-liked-btn:hover {
+  background: #e55a8a;
+}
+
+/* Liked Modal Styles */
+.liked-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: #333;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.no-liked {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 40px;
+}
+
+.liked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.liked-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 12px;
+  color: white;
+}
+
+.liked-item-content h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+}
+
+.liked-item-content p {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.unlike-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background 0.3s ease;
+}
+
+.unlike-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+}
+
+.clear-all-btn {
+  background: #ff4757;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s ease;
+}
+
+.clear-all-btn:hover {
+  background: #ff3742;
+}
+
+/* Debug Info Styles */
+.debug-info {
+  position: fixed;
+  top: 90px;
+  right: 20px;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.8em;
+  font-family: monospace;
+  z-index: 1500;
+  min-width: 250px;
+}
+
+.debug-info p {
+  margin: 4px 0;
+}
+
+/* Test Button Styles */
+.test-speed-btn {
+  position: fixed;
+  top: 200px;
+  right: 20px;
+  z-index: 2000;
+  padding: 10px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
 /* Main layout styles */
 .hero.is-light {
   padding-top: 0;
@@ -233,8 +909,6 @@ export default {
 
 .list-item {
   position: absolute;
-  width: 150px;
-  height: 150px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -249,10 +923,8 @@ export default {
 }
 
 .list-item:hover {
-  transform: translate(-50%, -50%) scale(1.1);
+  transform: translate(-50%, -50%) scale(1.05);
 }
-
-/* --- UPDATED: Removed .small-event class --- */
 
 .item-title {
   font-weight: 600;
@@ -327,7 +999,7 @@ export default {
   }
 }
 
-/* Top/Bottom Bars (Unchanged) */
+/* Top/Bottom Bars */
 .topbar {
   position: fixed;
   top: 0;
