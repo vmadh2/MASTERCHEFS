@@ -208,16 +208,20 @@ export default {
 <style scoped>
 /* Main layout styles */
 .hero.is-light {
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0;
+  margin: 0;
   height: 100vh;
+  background-color: #f0f4f8; /* A very light neutral background */
 }
 
+/* --- 💡 CSS FIX #1: Correctly position the container BETWEEN the bars --- */
 .content-container {
-  padding-top: 72px;
-  padding-bottom: 72px;
-  position: relative;
-  height: 100vh;
+  position: fixed;
+  top: 72px; /* Height of topbar */
+  bottom: 72px; /* Height of bottombar */
+  left: 0;
+  right: 0;
+  padding: 20px; /* Inner spacing for bubbles */
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -241,18 +245,17 @@ export default {
   justify-content: center;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transform: translate(-50%, -50%);
+  /* transform is now handled by the animation */
   animation: float 8s ease-in-out infinite alternate;
   transition: transform 0.3s ease;
 }
 
 .list-item:hover {
-  transform: translate(-50%, -50%) scale(1.1);
+  animation-play-state: paused; /* Pause float on hover */
+  transform: translate(-50%, -50%) scale(1.1); /* Keep centering on hover */
 }
-
-/* --- UPDATED: Removed .small-event class --- */
 
 .item-title {
   font-weight: 600;
@@ -260,7 +263,7 @@ export default {
   font-size: 1em;
   line-height: 1.2;
   padding: 0 12px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .item-time {
@@ -302,55 +305,62 @@ export default {
 
 /* Category Colors */
 .is-pastel-red {
-  background: linear-gradient(135deg, #ff8a80, #ff5252);
-  /* Favour */
+  background: linear-gradient(135deg, #ff8a80, #ff5252); /* Favour */
 }
-
 .is-pastel-blue {
-  background: linear-gradient(135deg, #40c4ff, #0091ea);
-  /* Question */
+  background: linear-gradient(135deg, #40c4ff, #0091ea); /* Question */
 }
-
 .is-pastel-green {
-  background: linear-gradient(135deg, #69f0ae, #00c853);
-  /* Announcement */
+  background: linear-gradient(135deg, #69f0ae, #00c853); /* Announcement */
 }
 
-/* Animation */
+/* --- 💡 CSS FIX #2: Correctly combine centering with animation --- */
 @keyframes float {
   from {
-    transform: translate(-25%, -25%) translateY(0px) rotate(0deg);
+    transform: translate(-50%, -50%) translateY(0px) rotate(-3deg);
   }
-
   to {
-    transform: translate(-25%, -25%) translateY(-20px) rotate(0deg);
+    transform: translate(-50%, -50%) translateY(-20px) rotate(3deg);
   }
 }
 
-/* Top/Bottom Bars (Unchanged) */
-.topbar {
+/* --- Top/Bottom Bars (Unchanged but cleaned up) --- */
+.topbar, .bottombar {
   position: fixed;
-  top: 0;
   left: 0;
   right: 0;
   height: 72px;
   background: #8de3ea;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06) inset;
   z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
 }
+.topbar {
+  top: 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.bottombar {
+  bottom: 0;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
 
-.topbar-inner {
+.topbar-inner, .bottombar-inner {
   width: 100%;
   max-width: 1100px;
+  height: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
   padding: 0 18px;
   box-sizing: border-box;
+}
+.topbar-inner {
+  justify-content: center;
+  position: relative;
+}
+.bottombar-inner {
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .topbar-title {
@@ -362,7 +372,6 @@ export default {
 .test-btn {
   height: 48px;
   border-radius: 10px;
-  color: white;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -370,68 +379,41 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 20px;
-  box-shadow: 4px 6px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   position: absolute;
   top: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.login-btn:active, .test-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .login-btn {
   right: 18px;
   background: #48c0c8;
+  color: white;
 }
-
 .test-btn {
   right: 96px;
   background: #ffd166;
   color: #073642;
 }
 
-.bottombar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 72px;
-  background: #8de3ea;
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.bottombar-inner {
-  width: 100%;
-  max-width: 1100px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-right: 18px;
-  box-sizing: border-box;
-}
-
-.bottombar-left,
-.bottombar-right {
+.bottombar-left, .bottombar-right {
   color: #073642;
 }
-
-.bottombar-toggle {
-  display: flex;
-  align-items: center;
-}
-
 .toggle-track {
   width: 58px;
   height: 28px;
   background: #fff;
   border-radius: 20px;
-  box-shadow: inset 0 0 0 2px #86d2d7;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
   display: flex;
   align-items: center;
   padding: 2px;
+  cursor: pointer;
 }
-
 .toggle-thumb {
   width: 24px;
   height: 24px;
