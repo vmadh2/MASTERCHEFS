@@ -9,9 +9,9 @@
         <label>Event type:</label>
         <select v-model="eventType" required>
           <option value="" disabled>Select category</option>
-          <option value="Favour">Favour</option>
-          <option value="Question">Question</option>
-          <option value="Announcement">Announcement</option>
+          <option value="Favour">Favour - Ask for Something</option>
+          <option value="Question">Question - Ask a Question</option>
+          <option value="Announcement">Announcement - Make an Announcement</option>
         </select>
 
         <label>Name:</label>
