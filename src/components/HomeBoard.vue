@@ -1,8 +1,8 @@
 <template>
-  <!-- Top bar (fixed) matching provided design -->
+    <!-- Top bar (fixed) with original colors -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="topbar-title">"THE INTERACTIVE BULLETIN"</div>
+      <div class="topbar-title">THE INTERACTIVE BULLETIN</div>
       <router-link :to="{ name: 'form-sheet' }" class="login-btn" role="button" aria-label="Open form sheet">
         Post
       </router-link>
@@ -13,10 +13,8 @@
   </header>
 
   <section class="hero is-light">
-    <!-- The ref on this container is crucial for measuring dimensions -->
     <div class="content-container" ref="contentContainer">
       <ul class="list">
-        <!-- Loop over the 'positionedItems' data property -->
         <li v-for="item in positionedItems" :key="item.id" class="list-item" :class="item.colorClass"
           :style="item.position" @click="selectItem(item)">
           <div class="item-title">{{ item.event_name }}</div>
@@ -25,11 +23,52 @@
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
       </ul>
 
-      <div v-if="selectedItem" class="details">
-        <h3>Details for {{ selectedItem.event_name }}</h3>
-        <!-- Displaying the raw data for debugging -->
-        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
-        <button @click="selectedItem = null">Close</button>
+      <!-- 💡 UPDATED: Details panel with useful, formatted information -->
+      <div v-if="selectedItem" class="details-overlay" @click.self="selectedItem = null">
+        <div class="details-card">
+          <div class="details-header">
+            <h3>{{ selectedItem.fullData.event_title }}</h3>
+            <button @click="selectedItem = null" class="close-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="details-body">
+            <p>{{ selectedItem.fullData.description }}</p>
+          </div>
+          <div class="details-meta">
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-user">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span>Posted by: <strong>{{ selectedItem.fullData.author_name }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="feather-calendar">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span>Event on: <strong>{{ formatDetailedTime(selectedItem.event_time) }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-mail">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <span>Contact: <strong>{{ selectedItem.fullData.author_contact }}</strong></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -49,7 +88,6 @@
 
 <script>
 import { collection, getDocs } from 'firebase/firestore'
-// Make sure this path is correct for your project structure
 import { db } from '../firebase.js'
 
 export default {
@@ -67,18 +105,16 @@ export default {
     };
   },
   methods: {
-    // --- DATA FETCHING & PROCESSING ---
     async fetchBubbles() {
       if (this.loading.fetchAll) return;
       this.loading.fetchAll = true;
       try {
         const querySnapshot = await getDocs(collection(db, 'bubbles'));
-        this.sections.forEach((s) => (s.items = [])); // Reset sections
+        this.sections.forEach((s) => (s.items = []));
 
         querySnapshot.forEach((doc) => {
           const d = doc.data();
           const type = (d.event_type || 'misc').toString().toLowerCase();
-
           const item = {
             id: doc.id,
             event_name: d.event_title || 'Unnamed Event',
@@ -86,7 +122,6 @@ export default {
             fullData: d,
             colorClass: this.getColorForType(type)
           };
-
           if (type.includes('favour')) this.sections[0].items.push(item);
           else if (type.includes('question')) this.sections[1].items.push(item);
           else this.sections[2].items.push(item);
@@ -99,8 +134,6 @@ export default {
         this.loading.fetchAll = false;
       }
     },
-
-    // --- LAYOUT & COLLISION AVOIDANCE ---
     generateNonOverlappingLayout() {
       const container = this.$refs.contentContainer;
       if (!container) return;
@@ -112,12 +145,10 @@ export default {
       const itemsToPlace = shuffled.slice(0, 5);
 
       const placedBubbles = [];
-      // --- UPDATED: A single, consistent diameter for all bubbles ---
-      const BUBBLE_DIAMETER = 150;
+      const BUBBLE_DIAMETER = 160;
 
       itemsToPlace.forEach(item => {
         const position = this.findValidPosition(placedBubbles, BUBBLE_DIAMETER, containerWidth, containerHeight);
-
         if (position) {
           placedBubbles.push({
             ...item,
@@ -133,15 +164,14 @@ export default {
       });
       this.positionedItems = placedBubbles;
     },
-
     findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const maxTries = 100;
       const radius = diameter / 2;
-      const padding = 15;
+      const padding = 25;
 
       for (let i = 0; i < maxTries; i++) {
-        const x = Math.random() * (containerWidth - diameter) + radius;
-        const y = Math.random() * (containerHeight - diameter) + radius;
+        const x = Math.random() * (containerWidth - diameter - padding * 2) + radius + padding;
+        const y = Math.random() * (containerHeight - diameter - padding * 2) + radius + padding;
 
         let hasOverlap = false;
         for (const placed of placedBubbles) {
@@ -157,47 +187,48 @@ export default {
         }
         if (!hasOverlap) return { x, y };
       }
-      // Fallback if no valid position is found
-      return {
-        x: Math.random() * (containerWidth - diameter) + radius,
-        y: Math.random() * (containerHeight - diameter) + radius
-      };
+      return null;
     },
-
-    // --- HELPERS ---
     getColorForType(type) {
       if (type.includes('favour')) return 'is-pastel-red';
       if (type.includes('question')) return 'is-pastel-blue';
-      return 'is-pastel-green'; // Announcement
+      return 'is-pastel-green';
     },
-
     normalizeWhen(value) {
       if (!value) return '';
-      // Firebase Timestamps from the SDK have a toDate() method
       if (value && typeof value.toDate === 'function') {
         return value.toDate().toISOString();
       }
-      // Fallback for strings or other date formats
       try {
         return new Date(value).toISOString();
       } catch {
         return '';
       }
     },
-
     formatTime(iso) {
       if (!iso) return '';
       const d = new Date(iso);
-      return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+      return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-AU');
     },
-
+    // --- 💡 ADDED: New formatter for the details panel ---
+    formatDetailedTime(iso) {
+      if (!iso) return 'Not specified';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Invalid Date';
+      return d.toLocaleString('en-AU', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+      });
+    },
     selectItem(item) {
       this.selectedItem = item;
     }
   },
   mounted() {
-    this.fetchBubbles();
-    window.addEventListener('resize', this.generateNonOverlappingLayout);
+    this.$nextTick(() => {
+      this.fetchBubbles();
+      window.addEventListener('resize', this.generateNonOverlappingLayout);
+    });
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.generateNonOverlappingLayout);
@@ -206,22 +237,29 @@ export default {
 </script>
 
 <style scoped>
-/* Main layout styles */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+:global(body) {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 .hero.is-light {
   padding: 0;
   margin: 0;
   height: 100vh;
-  background-color: #f0f4f8; /* A very light neutral background */
+  background-color: #f7f9fc;
+  background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23dce7f0" fill-opacity="0.4"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
 }
 
-/* --- 💡 CSS FIX #1: Correctly position the container BETWEEN the bars --- */
 .content-container {
   position: fixed;
-  top: 72px; /* Height of topbar */
-  bottom: 72px; /* Height of bottombar */
+  top: 72px;
+  bottom: 72px;
   left: 0;
   right: 0;
-  padding: 20px; /* Inner spacing for bubbles */
+  padding: 20px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -237,95 +275,168 @@ export default {
 
 .list-item {
   position: absolute;
-  width: 150px;
-  height: 150px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 10px 25px rgba(45, 55, 72, 0.08);
   cursor: pointer;
-  /* transform is now handled by the animation */
   animation: float 8s ease-in-out infinite alternate;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .list-item:hover {
-  animation-play-state: paused; /* Pause float on hover */
-  transform: translate(-50%, -50%) scale(1.1); /* Keep centering on hover */
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.06), 0 20px 40px rgba(45, 55, 72, 0.1);
 }
 
 .item-title {
   font-weight: 600;
   color: white;
-  font-size: 1em;
-  line-height: 1.2;
-  padding: 0 12px;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+  font-size: 1.05em;
+  line-height: 1.3;
+  padding: 0 15px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.25);
+  margin-bottom: 4px;
 }
 
 .item-time {
+  font-weight: 400;
   font-size: 0.8em;
   color: white;
-  margin-top: 5px;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .empty {
-  color: #888;
+  color: #a0aec0;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.details {
+/* --- 💡 NEW: Styles for the details modal --- */
+.details-overlay {
   position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(10, 20, 30, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  backdrop-filter: blur(8px);
+}
+
+.details-card {
   width: 90%;
-  max-width: 600px;
-  padding: 16px;
-  border-radius: 12px;
+  max-width: 500px;
+  padding: 24px;
+  border-radius: 16px;
   background: white;
-  z-index: 1001;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.3s ease-out;
 }
 
-.details pre {
-  background: #f1f1f1;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-  max-height: 200px;
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
 }
 
-/* Category Colors */
+.details-header h3 {
+  margin: 0;
+  font-size: 1.4em;
+  color: #2d3748;
+  line-height: 1.3;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #a0aec0;
+  padding: 4px;
+}
+
+.close-btn:hover {
+  color: #4a5568;
+}
+
+.details-body p {
+  margin: 0 0 20px 0;
+  color: #4a5568;
+  font-size: 1em;
+  line-height: 1.6;
+}
+
+.details-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9em;
+  color: #718096;
+}
+
+.meta-item svg {
+  flex-shrink: 0;
+}
+
+.meta-item strong {
+  color: #2d3748;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .is-pastel-red {
-  background: linear-gradient(135deg, #ff8a80, #ff5252); /* Favour */
-}
-.is-pastel-blue {
-  background: linear-gradient(135deg, #40c4ff, #0091ea); /* Question */
-}
-.is-pastel-green {
-  background: linear-gradient(135deg, #69f0ae, #00c853); /* Announcement */
+  background: linear-gradient(145deg, #FF9A8B, #FF6A88);
 }
 
-/* --- 💡 CSS FIX #2: Correctly combine centering with animation --- */
+.is-pastel-blue {
+  background: linear-gradient(145deg, #89CFF0, #6495ED);
+}
+
+.is-pastel-green {
+  background: linear-gradient(145deg, #98FB98, #55C595);
+}
+
 @keyframes float {
   from {
     transform: translate(-50%, -50%) translateY(0px) rotate(-3deg);
   }
+
   to {
     transform: translate(-50%, -50%) translateY(-20px) rotate(3deg);
   }
 }
 
-/* --- Top/Bottom Bars (Unchanged but cleaned up) --- */
-.topbar, .bottombar {
+.topbar,
+.bottombar {
   position: fixed;
   left: 0;
   right: 0;
@@ -336,16 +447,19 @@ export default {
   justify-content: center;
   align-items: center;
 }
+
 .topbar {
   top: 0;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-.bottombar {
-  bottom: 0;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-.topbar-inner, .bottombar-inner {
+.bottombar {
+  bottom: 0;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-inner,
+.bottombar-inner {
   width: 100%;
   max-width: 1100px;
   height: 100%;
@@ -354,10 +468,12 @@ export default {
   padding: 0 18px;
   box-sizing: border-box;
 }
+
 .topbar-inner {
   justify-content: center;
   position: relative;
 }
+
 .bottombar-inner {
   justify-content: flex-end;
   gap: 12px;
@@ -365,28 +481,31 @@ export default {
 
 .topbar-title {
   font-size: 20px;
+  font-weight: 700;
   color: #073642;
 }
 
 .login-btn,
 .test-btn {
   height: 48px;
-  border-radius: 10px;
-  font-weight: 700;
+  border-radius: 12px;
+  font-weight: 600;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  padding: 0 24px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   position: absolute;
   top: 12px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
-.login-btn:active, .test-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+
+.login-btn:active,
+.test-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .login-btn {
@@ -394,26 +513,32 @@ export default {
   background: #48c0c8;
   color: white;
 }
+
 .test-btn {
-  right: 96px;
-  background: #ffd166;
-  color: #073642;
+  right: 122px;
+  background: #ffffff;
+  color: #48c0c8;
+  border: 1px solid #b2e9ed;
 }
 
-.bottombar-left, .bottombar-right {
+.bottombar-left,
+.bottombar-right {
   color: #073642;
+  font-weight: 600;
 }
+
 .toggle-track {
   width: 58px;
   height: 28px;
   background: #fff;
   border-radius: 20px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: inset 0 0 0 2px #86d2d7;
   display: flex;
   align-items: center;
   padding: 2px;
   cursor: pointer;
 }
+
 .toggle-thumb {
   width: 24px;
   height: 24px;
@@ -422,4 +547,3 @@ export default {
   transition: transform 0.22s cubic-bezier(.2, .9, .2, 1);
 }
 </style>
-
