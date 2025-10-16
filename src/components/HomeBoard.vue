@@ -1,5 +1,5 @@
 <template>
-    <!-- Top bar (fixed) with original colors -->
+  <!-- Top bar (fixed) with original colors -->
   <header class="topbar">
     <div class="topbar-inner">
       <div class="topbar-title">THE INTERACTIVE BULLETIN</div>
@@ -23,7 +23,7 @@
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
       </ul>
 
-      <!-- 💡 UPDATED: Details panel with useful, formatted information -->
+      <!-- Details panel with useful, formatted information -->
       <div v-if="selectedItem" class="details-overlay" @click.self="selectedItem = null">
         <div class="details-card">
           <div class="details-header">
@@ -42,7 +42,8 @@
           <div class="details-meta">
             <div class="meta-item">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-user">
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="feather-user">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
@@ -61,7 +62,8 @@
             </div>
             <div class="meta-item">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-mail">
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="feather-mail">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                 <polyline points="22,6 12,13 2,6"></polyline>
               </svg>
@@ -76,12 +78,30 @@
   <!-- Bottom bar (fixed) -->
   <footer class="bottombar">
     <div class="bottombar-inner">
-      <div class="bottombar-left">Public</div>
-      <router-link :to="{ name: 'private-board' }" class="bottombar-toggle toggle-track" role="switch"
-        aria-checked="false" tabindex="0" aria-label="Toggle visibility between Public and Private">
-        <div class="toggle-thumb"></div>
-      </router-link>
-      <div class="bottombar-right">Private</div>
+      <!-- 💡 NEW: Color-coded legend -->
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-dot is-pastel-red"></span>
+          <span>Favour</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot is-pastel-blue"></span>
+          <span>Question</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot is-pastel-green"></span>
+          <span>Announcement</span>
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <div class="bottombar-left">Public</div>
+        <router-link :to="{ name: 'private-board' }" class="bottombar-toggle toggle-track" role="switch"
+          aria-checked="false" tabindex="0" aria-label="Toggle visibility between Public and Private">
+          <div class="toggle-thumb"></div>
+        </router-link>
+        <div class="bottombar-right">Private</div>
+      </div>
     </div>
   </footer>
 </template>
@@ -210,7 +230,6 @@ export default {
       const d = new Date(iso);
       return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-AU');
     },
-    // --- 💡 ADDED: New formatter for the details panel ---
     formatDetailedTime(iso) {
       if (!iso) return 'Not specified';
       const d = new Date(iso);
@@ -320,7 +339,6 @@ export default {
   transform: translate(-50%, -50%);
 }
 
-/* --- 💡 NEW: Styles for the details modal --- */
 .details-overlay {
   position: fixed;
   top: 0;
@@ -407,6 +425,7 @@ export default {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -474,9 +493,9 @@ export default {
   position: relative;
 }
 
+/* --- 💡 UPDATED: Justify content to space-between --- */
 .bottombar-inner {
-  justify-content: flex-end;
-  gap: 12px;
+  justify-content: space-between;
 }
 
 .topbar-title {
@@ -521,6 +540,13 @@ export default {
   border: 1px solid #b2e9ed;
 }
 
+/* --- 💡 NEW: Wrapper for the toggle group --- */
+.toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .bottombar-left,
 .bottombar-right {
   color: #073642;
@@ -546,4 +572,31 @@ export default {
   border-radius: 50%;
   transition: transform 0.22s cubic-bezier(.2, .9, .2, 1);
 }
+
+/* --- 💡 NEW: Styles for the legend --- */
+.legend {
+  display: flex;
+  gap: 24px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.legend-item span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #073642;
+}
 </style>
+
