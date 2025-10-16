@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="form-page">
     <nav class="taskbar">
       <span class="app-title">Office Favours</span>
     </nav>
@@ -39,8 +39,8 @@
 </template>
 
 <script>
-import { addDoc, Timestamp } from 'firebase/firestore';
-import { bubblesCollection } from '@/main.js'; // Adjust the path if main.js is not in src/
+import { addDoc } from 'firebase/firestore';
+import { bubblesCollection, Timestamp } from '@/firebase.js';
 
 export default {
   data() {
@@ -221,10 +221,11 @@ textarea {
   margin-top: 12px;
 }
 
-body, html {
-  margin: 0;
-  padding: 0;
+.form-page {
+  min-height: 100vh;
   background: url('../../images/formBackground.png') no-repeat center center fixed;
   background-size: cover;
+  margin: 0;
+  padding: 0;
 }
 </style>

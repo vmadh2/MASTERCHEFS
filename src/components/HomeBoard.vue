@@ -35,31 +35,18 @@
           <div class="item-title">{{ item.event_name }}</div>
           <div class="item-time">{{ formatTime(item.event_time) }}</div>
           
-          <!-- Like Heart Button -->
-          <button 
-            class="like-btn" 
-            :class="{ 'liked': isLiked(item.id) }"
-            @click.stop="toggleLike(item)"
-            :title="isLiked(item.id) ? 'Unlike' : 'Like'"
-          >
-            {{ isLiked(item.id) ? '❤️' : '🤍' }}
-          </button>
+
         </li>
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
       </ul>
 
-      <!-- Liked Items Counter -->
-      <div class="liked-counter">
-        <span>❤️ {{ likedBubbles.size }} bubbles liked</span>
-        <button @click="showLikedBubbles" class="view-liked-btn">View Liked</button>
-      </div>
+
 
       <!-- Debug Info (can be removed later) -->
       <div class="debug-info">
         <p>Listening for speed data: {{ speedListener ? 'Active' : 'Inactive' }}</p>
         <p>Current bubble limit: {{ bubbleLimit || 'Default (5)' }}</p>
         <p>Last speed timestamp: {{ lastSpeedTimestamp ? new Date(lastSpeedTimestamp).toLocaleTimeString() : 'None' }}</p>
-        <p>Liked bubbles: {{ Array.from(likedBubbles).join(', ') }}</p>
       </div>
 
       <!-- Test Button -->
@@ -67,32 +54,7 @@
         Test Speed Connection
       </button>
 
-      <!-- Liked Bubbles Modal -->
-      <div v-if="showLikedModal" class="liked-modal" @click.self="showLikedModal = false">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>❤️ Liked Bubbles ({{ likedBubblesData.length }})</h3>
-            <button @click="showLikedModal = false" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div v-if="likedBubblesData.length === 0" class="no-liked">
-              No bubbles liked yet!
-            </div>
-            <div v-else class="liked-list">
-              <div v-for="bubble in likedBubblesData" :key="bubble.id" class="liked-item" :class="bubble.colorClass">
-                <div class="liked-item-content">
-                  <h4>{{ bubble.event_name }}</h4>
-                  <p>{{ formatTime(bubble.event_time) }}</p>
-                </div>
-                <button @click="toggleLike(bubble)" class="unlike-btn">❤️</button>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button @click="clearAllLikes" class="clear-all-btn">Clear All</button>
-          </div>
-        </div>
-      </div>
+
 
       <div v-if="selectedItem" class="details">
         <h3>Details for {{ selectedItem.event_name }}</h3>
@@ -142,83 +104,12 @@ export default {
       lastDetectedSpeed: 0,
       currentBubbleCount: 5,
       resetCountdown: 0,
-      countdownTimer: null,
-      // Liking functionality
-      likedBubbles: new Set(), // Store liked bubble IDs
-      showLikedModal: false,
-      allBubblesData: [] // Store all bubble data for liked modal
+      countdownTimer: null
     };
   },
-  computed: {
-    likedBubblesData() {
-      // Return full data for liked bubbles
-      return this.allBubblesData.filter(bubble => this.likedBubbles.has(bubble.id));
-    }
-  },
+
   methods: {
-    // --- LIKING FUNCTIONALITY ---
-    toggleLike(item) {
-      console.log('Toggle like for:', item.id, item.event_name);
-      
-      if (this.likedBubbles.has(item.id)) {
-        // Unlike
-        this.likedBubbles.delete(item.id);
-        console.log('Unliked:', item.event_name);
-      } else {
-        // Like
-        this.likedBubbles.add(item.id);
-        console.log('Liked:', item.event_name);
-      }
-      
-      // Save to localStorage
-      this.saveLikesToStorage();
-      
-      // Force reactivity update
-      this.$forceUpdate();
-    },
-
-    isLiked(bubbleId) {
-      return this.likedBubbles.has(bubbleId);
-    },
-
-    saveLikesToStorage() {
-      try {
-        const likesArray = Array.from(this.likedBubbles);
-        localStorage.setItem('likedBubbles', JSON.stringify(likesArray));
-        console.log('Saved likes to localStorage:', likesArray);
-      } catch (error) {
-        console.error('Error saving likes to localStorage:', error);
-      }
-    },
-
-    loadLikesFromStorage() {
-      try {
-        const saved = localStorage.getItem('likedBubbles');
-        if (saved) {
-          const likesArray = JSON.parse(saved);
-          this.likedBubbles = new Set(likesArray);
-          console.log('Loaded likes from localStorage:', likesArray);
-        }
-      } catch (error) {
-        console.error('Error loading likes from localStorage:', error);
-        this.likedBubbles = new Set(); // Reset to empty set on error
-      }
-    },
-
-    showLikedBubbles() {
-      this.showLikedModal = true;
-    },
-
-    clearAllLikes() {
-      if (confirm('Are you sure you want to clear all liked bubbles?')) {
-        this.likedBubbles.clear();
-        this.saveLikesToStorage();
-        this.$forceUpdate();
-        console.log('Cleared all likes');
-      }
-    },
-
-    // --- NEW: BUBBLE SIZE CALCULATION BASED ON TIME DELTA ---
+    // --- BUBBLE SIZE CALCULATION BASED ON TIME DELTA ---
     calculateBubbleSize(item) {
       try {
         const now = new Date();
@@ -269,7 +160,6 @@ export default {
       try {
         const querySnapshot = await getDocs(collection(db, 'bubbles'));
         this.sections.forEach((s) => (s.items = [])); // Reset sections
-        this.allBubblesData = []; // Reset all bubbles data
 
         querySnapshot.forEach((doc) => {
           const d = doc.data();
@@ -284,9 +174,6 @@ export default {
             fullData: d,
             colorClass: this.getColorForType(type)
           };
-
-          // Add to allBubblesData for liked modal
-          this.allBubblesData.push(item);
 
           if (type.includes('favour')) this.sections[0].items.push(item);
           else if (type.includes('question')) this.sections[1].items.push(item);
@@ -570,9 +457,6 @@ export default {
   mounted() {
     console.log('🚀 HomeBoard mounted, fetching bubbles...');
     
-    // Load likes from localStorage first
-    this.loadLikesFromStorage();
-    
     this.fetchBubbles();
     window.addEventListener('resize', this.generateNonOverlappingLayout);
     
@@ -645,209 +529,7 @@ export default {
   color: #a0aec0;
 }
 
-/* Like Button Styles */
-.like-btn {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-  z-index: 10;
-}
 
-.like-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.like-btn.liked {
-  background: rgba(255, 255, 255, 1);
-  animation: heartBeat 0.6s ease;
-}
-
-@keyframes heartBeat {
-  0% { transform: scale(1); }
-  25% { transform: scale(1.2); }
-  50% { transform: scale(1); }
-  75% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-/* Liked Counter Styles */
-.liked-counter {
-  position: fixed;
-  bottom: 90px;
-  left: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 12px 16px;
-  border-radius: 25px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 1500;
-}
-
-.liked-counter span {
-  font-weight: 600;
-  color: #333;
-}
-
-.view-liked-btn {
-  background: #ff6b9d;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 15px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.3s ease;
-}
-
-.view-liked-btn:hover {
-  background: #e55a8a;
-}
-
-/* Liked Modal Styles */
-.liked-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: #333;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  color: #333;
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-}
-
-.no-liked {
-  text-align: center;
-  color: #666;
-  font-style: italic;
-  padding: 40px;
-}
-
-.liked-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.liked-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  border-radius: 12px;
-  color: white;
-}
-
-.liked-item-content h4 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-}
-
-.liked-item-content p {
-  margin: 0;
-  font-size: 12px;
-  opacity: 0.9;
-}
-
-.unlike-btn {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-  transition: background 0.3s ease;
-}
-
-.unlike-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.modal-footer {
-  padding: 20px;
-  border-top: 1px solid #eee;
-  display: flex;
-  justify-content: center;
-}
-
-.clear-all-btn {
-  background: #ff4757;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.3s ease;
-}
-
-.clear-all-btn:hover {
-  background: #ff3742;
-}
 
 /* Debug Info Styles */
 .debug-info {

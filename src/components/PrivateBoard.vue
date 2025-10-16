@@ -8,48 +8,103 @@
         class="login-btn"
         role="button"
         aria-label="Open form sheet"
-        style="display:flex;align-items:center;justify-content:center"
       >
-      Post
+        Post
       </router-link>
     </div>
   </header>
 
-  <section class="hero is-light">
-    <div class="hero-body is-align-items-center">
-      <div class="container has-text-centered stretch" style="width:100%;">
-        <div class="bubble-container" ref="bubbleContainer">
-          <!-- Only show content when data is loaded to prevent background flicker -->
-          <template v-if="isDataLoaded">
-            <!-- Show liked bubbles if any exist -->
-            <div
-              v-for="(bubble, index) in likedBubblesForDisplay"
-              :key="bubble.id"
-              class="bubble"
-              :class="bubble.colorClass"
-              :style="bubbleStyle(bubble, index)"
-              @click="selectBubble(bubble)"
-            >
-              <p>{{ bubble.event_name }}</p>
-              <!-- Heart indicator -->
-              <div class="heart-indicator">❤️</div>
-            </div>
+  <!-- Filter Controls -->
+  <div class="filter-bar">
+    <div class="filter-section">
+      <label>Filter by Type:</label>
+      <select v-model="typeFilter">
+        <option value="all">All Types</option>
+        <option value="favour">Favour</option>
+        <option value="question">Question</option>
+        <option value="announcement">Announcement</option>
+      </select>
+    </div>
+    
+    <div class="filter-section">
+      <label>Filter by Status:</label>
+      <select v-model="likedFilter">
+        <option value="all">All Bubbles</option>
+        <option value="liked">Liked Only</option>
+        <option value="unliked">Unliked Only</option>
+      </select>
+    </div>
 
-            <!-- Show message if no liked bubbles (only after data loads) -->
-            <div v-if="likedBubblesForDisplay.length === 0" class="no-likes-message">
-              <h2>No Liked Bubbles Yet! 💔</h2>
-              <p>Go to the Public board and like some bubbles to see them here.</p>
-              <router-link :to="{ name: 'home-board' }" class="go-public-btn">
-                Go to Public Board
-              </router-link>
-            </div>
-          </template>
+    <div class="filter-stats">
+      Showing {{ filteredItems.length }} of {{ allBubblesData.length }} bubbles
+      | ❤️ {{ likedBubbles.size }} liked
+    </div>
+  </div>
+
+  <section class="hero is-light">
+    <!-- The ref on this container is crucial for measuring dimensions -->
+    <div class="content-container" ref="contentContainer">
+      <ul class="list">
+        <!-- Loop over the 'positionedItems' data property with dynamic sizes -->
+        <li v-for="item in positionedItems" :key="item.id" 
+            class="list-item" 
+            :class="item.colorClass"
+            :style="{ ...item.position, ...item.dynamicStyle }" 
+            @click="selectItem(item)">
+          <div class="item-title">{{ item.event_name }}</div>
+          <div class="item-time">{{ formatTime(item.event_time) }}</div>
           
-          <!-- Loading state -->
-          <div v-else class="loading-message">
-            <p>Loading your liked bubbles...</p>
+          <!-- Like Heart Button -->
+          <button 
+            class="like-btn" 
+            :class="{ 'liked': isLiked(item.id) }"
+            @click.stop="toggleLike(item)"
+            :title="isLiked(item.id) ? 'Unlike' : 'Like'"
+          >
+            {{ isLiked(item.id) ? '❤️' : '🤍' }}
+          </button>
+        </li>
+        <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
+      </ul>
+
+      <!-- Liked Items Counter -->
+      <div class="liked-counter">
+        <span>❤️ {{ likedBubbles.size }} bubbles liked</span>
+        <button @click="showLikedModal = true" class="view-liked-btn">View Liked</button>
+      </div>
+
+      <!-- Liked Bubbles Modal -->
+      <div v-if="showLikedModal" class="liked-modal" @click.self="showLikedModal = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>❤️ Liked Bubbles ({{ likedBubblesData.length }})</h3>
+            <button @click="showLikedModal = false" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="likedBubblesData.length === 0" class="no-liked">
+              No bubbles liked yet!
+            </div>
+            <div v-else class="liked-list">
+              <div v-for="bubble in likedBubblesData" :key="bubble.id" class="liked-item" :class="bubble.colorClass">
+                <div class="liked-item-content">
+                  <h4>{{ bubble.event_name }}</h4>
+                  <p>{{ formatTime(bubble.event_time) }}</p>
+                </div>
+                <button @click="toggleLike(bubble)" class="unlike-btn">❤️</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="clearAllLikes" class="clear-all-btn">Clear All</button>
           </div>
         </div>
+      </div>
+
+      <div v-if="selectedItem" class="details">
+        <h3>Details for {{ selectedItem.event_name }}</h3>
+        <!-- Displaying the raw data for debugging -->
+        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
+        <button @click="selectedItem = null">Close</button>
       </div>
     </div>
   </section>
@@ -100,47 +155,165 @@ export default {
   name: 'PrivateBoard',
   data() {
     return {
-      likedBubbles: new Set(),
+      sections: [
+        { key: 'favour', label: 'Favour', items: [] },
+        { key: 'question', label: 'Question', items: [] },
+        { key: 'announcement', label: 'Announcement', items: [] },
+      ],
+      positionedItems: [],
+      loading: { fetchAll: false },
+      selectedItem: null,
       allBubblesData: [],
-      selectedBubble: null,
-      containerWidth: 0,
-      containerHeight: 0,
-      isDataLoaded: false, // Add loading state to prevent flicker
+      // Liking functionality
+      likedBubbles: new Set(), // Store liked bubble IDs
+      showLikedModal: false,
+      // Filtering
+      typeFilter: 'all', // all, favour, question, announcement
+      likedFilter: 'all', // all, liked, unliked
     };
   },
   computed: {
-    likedBubblesForDisplay() {
-      const liked = this.allBubblesData.filter(bubble => this.likedBubbles.has(bubble.id));
+    likedBubblesData() {
+      // Return full data for liked bubbles
+      return this.allBubblesData.filter(bubble => this.likedBubbles.has(bubble.id));
+    },
+    
+    filteredItems() {
+      let filtered = [...this.allBubblesData];
       
-      return liked.map((bubble, index) => ({
-        ...bubble,
-        x: this.generatePosition(index, 'x'),
-        y: this.generatePosition(index, 'y'),
-        size: this.generateSize(index),
-        delay: index * 0.5
-      }));
+      // Filter by type
+      if (this.typeFilter !== 'all') {
+        filtered = filtered.filter(item => {
+          const type = (item.fullData.event_type || 'misc').toString().toLowerCase();
+          return type.includes(this.typeFilter);
+        });
+      }
+      
+      // Filter by liked status
+      if (this.likedFilter === 'liked') {
+        filtered = filtered.filter(item => this.likedBubbles.has(item.id));
+      } else if (this.likedFilter === 'unliked') {
+        filtered = filtered.filter(item => !this.likedBubbles.has(item.id));
+      }
+      
+      return filtered;
     }
   },
   methods: {
+    // --- LIKING FUNCTIONALITY ---
+    toggleLike(item) {
+      console.log('Toggle like for:', item.id, item.event_name);
+      
+      if (this.likedBubbles.has(item.id)) {
+        // Unlike
+        this.likedBubbles.delete(item.id);
+        console.log('Unliked:', item.event_name);
+      } else {
+        // Like
+        this.likedBubbles.add(item.id);
+        console.log('Liked:', item.event_name);
+      }
+      
+      // Save to localStorage
+      this.saveLikesToStorage();
+      
+      // Regenerate layout to reflect filtering changes
+      this.generateNonOverlappingLayout();
+      
+      // Force reactivity update
+      this.$forceUpdate();
+    },
+
+    isLiked(bubbleId) {
+      return this.likedBubbles.has(bubbleId);
+    },
+
+    saveLikesToStorage() {
+      try {
+        const likesArray = Array.from(this.likedBubbles);
+        localStorage.setItem('likedBubbles', JSON.stringify(likesArray));
+        console.log('Saved likes to localStorage:', likesArray);
+      } catch (error) {
+        console.error('Error saving likes to localStorage:', error);
+      }
+    },
+
     loadLikesFromStorage() {
       try {
         const saved = localStorage.getItem('likedBubbles');
         if (saved) {
           const likesArray = JSON.parse(saved);
           this.likedBubbles = new Set(likesArray);
-          console.log('Private Board - Loaded likes from localStorage:', likesArray);
+          console.log('Loaded likes from localStorage:', likesArray);
         }
       } catch (error) {
         console.error('Error loading likes from localStorage:', error);
-        this.likedBubbles = new Set();
+        this.likedBubbles = new Set(); // Reset to empty set on error
       }
     },
 
-    async fetchAllBubbles() {
+    clearAllLikes() {
+      if (confirm('Are you sure you want to clear all liked bubbles?')) {
+        this.likedBubbles.clear();
+        this.saveLikesToStorage();
+        this.generateNonOverlappingLayout(); // Regenerate layout
+        this.$forceUpdate();
+        console.log('Cleared all likes');
+      }
+    },
+
+    // --- BUBBLE SIZE CALCULATION BASED ON TIME DELTA ---
+    calculateBubbleSize(item) {
       try {
-        console.log('Private Board - Fetching all bubbles from Firebase...');
+        const now = new Date();
+        const createdAt = new Date(item.bubble_created || item.event_time);
+        const eventTime = new Date(item.event_when || item.event_time);
+        
+        // Calculate time delta in hours
+        const totalDeltaMs = Math.abs(eventTime.getTime() - createdAt.getTime());
+        const remainingDeltaMs = Math.abs(eventTime.getTime() - now.getTime());
+        
+        // If event has passed, use a default smaller size
+        if (now > eventTime) {
+          console.log(`Event ${item.event_name} has passed, using minimum size`);
+          return 200; // Minimum size for past events
+        }
+        
+        // Calculate urgency ratio (0 = just created, 1 = about to happen)
+        const urgencyRatio = totalDeltaMs > 0 ? 
+          Math.max(0, Math.min(1, 1 - (remainingDeltaMs / totalDeltaMs))) : 0;
+        
+        // Size range: 120px (far from event) to 200px (close to event)
+        const minSize = 120;
+        const maxSize = 200;
+        const calculatedSize = minSize + (urgencyRatio * (maxSize - minSize));
+        
+        console.log(`Bubble ${item.event_name}:`, {
+          createdAt: createdAt.toLocaleString(),
+          eventTime: eventTime.toLocaleString(),
+          now: now.toLocaleString(),
+          totalDeltaHours: (totalDeltaMs / (1000 * 60 * 60)).toFixed(2),
+          remainingDeltaHours: (remainingDeltaMs / (1000 * 60 * 60)).toFixed(2),
+          urgencyRatio: urgencyRatio.toFixed(3),
+          size: Math.round(calculatedSize)
+        });
+        
+        return Math.round(calculatedSize);
+        
+      } catch (error) {
+        console.error('Error calculating bubble size for', item.event_name, error);
+        return 150; // Default fallback size
+      }
+    },
+
+    // --- DATA FETCHING & PROCESSING ---
+    async fetchBubbles() {
+      if (this.loading.fetchAll) return;
+      this.loading.fetchAll = true;
+      try {
         const querySnapshot = await getDocs(collection(db, 'bubbles'));
-        this.allBubblesData = [];
+        this.sections.forEach((s) => (s.items = [])); // Reset sections
+        this.allBubblesData = []; // Reset all bubbles data
 
         querySnapshot.forEach((doc) => {
           const d = doc.data();
@@ -150,125 +323,114 @@ export default {
             id: doc.id,
             event_name: d.event_title || 'Unnamed Event',
             event_time: this.normalizeWhen(d.event_when || d.bubble_created),
+            event_when: this.normalizeWhen(d.event_when), // Keep original event time
+            bubble_created: this.normalizeWhen(d.bubble_created), // Keep creation time
             fullData: d,
-            colorClass: this.getColorForType(type),
-            event_type: type
+            colorClass: this.getColorForType(type)
           };
 
+          // Add to allBubblesData for filtering and liked modal
           this.allBubblesData.push(item);
+
+          if (type.includes('favour')) this.sections[0].items.push(item);
+          else if (type.includes('question')) this.sections[1].items.push(item);
+          else this.sections[2].items.push(item);
         });
 
-        console.log('Private Board - Fetched', this.allBubblesData.length, 'total bubbles');
-        console.log('Private Board - Found', this.likedBubblesForDisplay.length, 'liked bubbles');
-        
-        // Mark data as loaded to prevent background flicker
-        this.isDataLoaded = true;
+        this.generateNonOverlappingLayout();
       } catch (err) {
         console.error('Failed to fetch bubbles:', err);
-        this.isDataLoaded = true; // Still mark as loaded to show error state
+      } finally {
+        this.loading.fetchAll = false;
       }
     },
 
-    generatePosition(index, axis) {
-      const positions = [
-        { x: 15, y: 20 },
-        { x: 75, y: 15 },
-        { x: 10, y: 60 },
-        { x: 60, y: 50 },
-        { x: 80, y: 70 },
-        { x: 30, y: 80 },
-        { x: 50, y: 25 },
-        { x: 85, y: 45 },
-      ];
+    // --- LAYOUT & COLLISION AVOIDANCE ---
+    generateNonOverlappingLayout() {
+      const container = this.$refs.contentContainer;
+      if (!container) return;
+
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
       
-      const pos = positions[index % positions.length];
-      return axis === 'x' ? pos.x : pos.y;
+      // Use filtered items instead of all items
+      const itemsToPlace = this.filteredItems.slice(0, 10); // Show up to 10 filtered items
+
+      const placedBubbles = [];
+
+      itemsToPlace.forEach(item => {
+        // Calculate dynamic size based on time delta
+        const bubbleSize = this.calculateBubbleSize(item);
+        
+        const position = this.findValidPosition(placedBubbles, bubbleSize, containerWidth, containerHeight);
+
+        if (position) {
+          placedBubbles.push({
+            ...item,
+            position: {
+              left: `${(position.x / containerWidth) * 100}%`,
+              top: `${(position.y / containerHeight) * 100}%`,
+            },
+            dynamicStyle: {
+              width: `${bubbleSize}px`,
+              height: `${bubbleSize}px`,
+            },
+            px: position.x,
+            py: position.y,
+            diameter: bubbleSize
+          });
+        }
+      });
+      
+      // Set the positioned items
+      this.positionedItems = placedBubbles;
     },
 
-    generateSize(index) {
-      const sizes = [150, 130, 140, 120, 160, 135, 125, 145];
-      return sizes[index % sizes.length];
-    },
+    findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
+      const maxTries = 100;
+      const radius = diameter / 2;
+      const padding = 15;
 
-    updateContainerSize() {
-      const el = this.$refs.bubbleContainer;
-      if (el) {
-        const topBar = document.querySelector('.topbar');
-        const bottomBar = document.querySelector('.bottombar');
-        const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 72;
-        const bottomH = bottomBar ? Math.round(bottomBar.getBoundingClientRect().height) : 72;
+      for (let i = 0; i < maxTries; i++) {
+        const x = Math.random() * (containerWidth - diameter) + radius;
+        const y = Math.random() * (containerHeight - diameter) + radius;
 
-        const availableHeight = Math.max(120, window.innerHeight - topH - bottomH);
-        el.style.height = `${availableHeight}px`;
+        let hasOverlap = false;
+        for (const placed of placedBubbles) {
+          const dx = x - placed.px;
+          const dy = y - placed.py;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDistance = (radius + placed.diameter / 2) + padding;
 
-        this.containerWidth = el.clientWidth || 0;
-        this.containerHeight = el.clientHeight || 0;
+          if (distance < minDistance) {
+            hasOverlap = true;
+            break;
+          }
+        }
+        if (!hasOverlap) return { x, y };
       }
-    },
-
-    bubbleStyle(bubble, index) {
-      const w = this.containerWidth;
-      const h = this.containerHeight;
-      const size = bubble.size || 150;
-
-      const style = {
-        width: `${size}px`,
-        height: `${size}px`,
-        animationDelay: `${bubble.delay}s`,
-        lineHeight: `${size}px`,
+      
+      // Fallback if no valid position is found
+      return {
+        x: Math.random() * (containerWidth - diameter) + radius,
+        y: Math.random() * (containerHeight - diameter) + radius
       };
-
-      if (w > 0 && h > 0) {
-        const maxAllowed = Math.min(w * 0.6, h * 0.6);
-        const sizeClamp = Math.min(size, Math.max(24, maxAllowed));
-
-        let leftPx = (bubble.x / 100) * w;
-        let topPx = (bubble.y / 100) * h;
-
-        const safetyMargin = 22;
-        const maxLeft = Math.max(0, w - sizeClamp);
-        const maxTop = Math.max(0, h - sizeClamp - safetyMargin);
-
-        leftPx = Math.max(0, Math.min(leftPx, maxLeft));
-        topPx = Math.max(0, Math.min(topPx, maxTop));
-
-        style.width = `${sizeClamp}px`;
-        style.height = `${sizeClamp}px`;
-        style.lineHeight = `${sizeClamp}px`;
-        style.left = `${leftPx}px`;
-        style.top = `${topPx}px`;
-        style.transform = 'none';
-      } else {
-        style.left = `${bubble.x}%`;
-        style.top = `${bubble.y}%`;
-        style.transform = 'translate(-50%, -50%)';
-      }
-
-      return style;
     },
 
-    selectBubble(bubble) {
-      this.selectedBubble = bubble;
-    },
-
-    getBubbleType(bubble) {
-      if (bubble.event_type.includes('favour')) return 'Favour';
-      if (bubble.event_type.includes('question')) return 'Question';
-      if (bubble.event_type.includes('announcement')) return 'Announcement';
-      return 'Other';
-    },
-
+    // --- HELPERS ---
     getColorForType(type) {
       if (type.includes('favour')) return 'is-pastel-red';
       if (type.includes('question')) return 'is-pastel-blue';
-      return 'is-pastel-green';
+      return 'is-pastel-green'; // Announcement
     },
 
     normalizeWhen(value) {
       if (!value) return '';
+      // Firebase Timestamps from the SDK have a toDate() method
       if (value && typeof value.toDate === 'function') {
         return value.toDate().toISOString();
       }
+      // Fallback for strings or other date formats
       try {
         return new Date(value).toISOString();
       } catch {
@@ -276,136 +438,174 @@ export default {
       }
     },
 
-    formatTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+    selectItem(item) {
+      this.selectedItem = item;
+      console.log('Selected item:', item);
+    },
+
+    formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return date.toLocaleString(); // Adjust format as needed
     }
   },
 
-  async mounted() {
-    console.log('Private Board mounted');
+  // Watch for filter changes to regenerate layout
+  watch: {
+    typeFilter() {
+      this.generateNonOverlappingLayout();
+    },
+    likedFilter() {
+      this.generateNonOverlappingLayout();
+    }
+  },
+
+  mounted() {
+    console.log('🚀 PrivateBoard mounted, fetching bubbles...');
     
+    // Load likes from localStorage first
     this.loadLikesFromStorage();
-    await this.fetchAllBubbles();
     
-    this.$nextTick(() => this.updateContainerSize());
-    this._resizeHandler = () => this.updateContainerSize();
-    window.addEventListener('resize', this._resizeHandler);
+    this.fetchBubbles();
+    window.addEventListener('resize', this.generateNonOverlappingLayout);
   },
 
   beforeUnmount() {
-    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
-  },
+    console.log('PrivateBoard unmounting, cleaning up...');
+    window.removeEventListener('resize', this.generateNonOverlappingLayout);
+  }
 };
 </script>
 
 <style scoped>
-/* Loading message */
-.loading-message {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #666;
-  font-size: 1.2em;
-}
-
-.bubble-container {
-  position: relative;
-  width: 100%;
-  overflow: visible;
-  margin: 0 auto;
-  /* Ensure no background shows during loading */
-  background: transparent;
-  min-height: 200px;
-}
-
-.bubble {
-  position: absolute;
-  border-radius: 50%;
+/* Filter Bar Styles */
+.filter-bar {
+  position: fixed;
+  top: 72px;
+  left: 0;
+  right: 0;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 12px 20px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: white;
-  font-weight: bold;
-  font-size: 1em;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  animation: float 10s ease-in-out infinite;
-  will-change: transform;
-  cursor: pointer;
-  transition: transform 0.3s ease;
+  gap: 24px;
+  z-index: 999;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.bubble:hover {
-  transform: scale(1.05) !important;
+.filter-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.bubble p {
+.filter-section label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
   margin: 0;
-  padding: 0 12px;
-  line-height: 1.2;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.heart-indicator {
+.filter-section select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+}
+
+.filter-section select:focus {
+  outline: none;
+  border-color: #eab580;
+  box-shadow: 0 0 0 2px rgba(234, 181, 128, 0.2);
+}
+
+.filter-stats {
+  margin-left: auto;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Like Button Styles */
+.like-btn {
   position: absolute;
   top: -8px;
   right: -8px;
-  font-size: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
   width: 32px;
   height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  z-index: 10;
 }
 
-.no-likes-message {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #666;
-  max-width: 400px;
+.like-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.no-likes-message h2 {
-  color: #333;
-  margin-bottom: 16px;
+.like-btn.liked {
+  background: rgba(255, 255, 255, 1);
+  animation: heartBeat 0.6s ease;
 }
 
-.no-likes-message p {
-  margin-bottom: 24px;
-  font-size: 1.1em;
-  line-height: 1.5;
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(1); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
-.go-public-btn {
-  background: #48c0c8;
-  color: white;
-  padding: 12px 24px;
+/* Liked Counter Styles */
+.liked-counter {
+  position: fixed;
+  bottom: 90px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 16px;
   border-radius: 25px;
-  text-decoration: none;
-  font-weight: 600;
-  display: inline-block;
-  transition: background 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1500;
 }
 
-.go-public-btn:hover {
-  background: #3aa5ac;
+.liked-counter span {
+  font-weight: 600;
+  color: #333;
+}
+
+.view-liked-btn {
+  background: #ff6b9d;
   color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.3s ease;
 }
 
-/* Bubble Modal */
-.bubble-modal {
+.view-liked-btn:hover {
+  background: #e55a8a;
+}
+
+/* Liked Modal Styles */
+.liked-modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -422,7 +622,10 @@ export default {
   background: white;
   border-radius: 16px;
   width: 90%;
-  max-width: 400px;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
@@ -457,36 +660,195 @@ export default {
 }
 
 .modal-body {
+  flex: 1;
+  overflow-y: auto;
   padding: 20px;
-  
 }
 
-
-
-.modal-body p {
-  margin: 12px 0;
-  color: #333;
-}
-
-.liked-indicator {
-  background: #ff6b9d;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
+.no-liked {
   text-align: center;
-  margin-top: 16px;
-  font-weight: 600;
+  color: #666;
+  font-style: italic;
+  padding: 40px;
 }
 
-.hero-body {
+.liked-list {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
-  background: white;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.container.stretch { 
-  height: auto; 
+.liked-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 12px;
+  color: white;
+}
+
+.liked-item-content h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+}
+
+.liked-item-content p {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.unlike-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background 0.3s ease;
+}
+
+.unlike-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+}
+
+.clear-all-btn {
+  background: #ff4757;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s ease;
+}
+
+.clear-all-btn:hover {
+  background: #ff3742;
+}
+
+/* Main layout styles */
+.hero.is-light {
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 100vh;
+}
+
+.content-container {
+  padding-top: 132px; /* Account for topbar (72px) + filter bar (60px) */
+  padding-bottom: 72px;
+  position: relative;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.list-item {
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  animation: float 8s ease-in-out infinite alternate;
+  transition: transform 0.3s ease;
+}
+
+.list-item:hover {
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+.item-title {
+  font-weight: 600;
+  color: white;
+  font-size: 1em;
+  line-height: 1.2;
+  padding: 0 12px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.item-time {
+  font-size: 0.8em;
+  color: white;
+  margin-top: 5px;
+  opacity: 0.9;
+}
+
+.empty {
+  color: #888;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.details {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  padding: 16px;
+  border-radius: 12px;
+  background: white;
+  z-index: 1001;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.details pre {
+  background: #f1f1f1;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+/* Category Colors */
+.is-pastel-red {
+  background: linear-gradient(135deg, #ff8a80, #ff5252);
+  /* Favour */
+}
+
+.is-pastel-blue {
+  background: linear-gradient(135deg, #40c4ff, #0091ea);
+  /* Question */
+}
+
+.is-pastel-green {
+  background: linear-gradient(135deg, #69f0ae, #00c853);
+  /* Announcement */
+}
+
+/* Animation */
+@keyframes float {
+  from {
+    transform: translate(-25%, -25%) translateY(0px) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-25%, -25%) translateY(-20px) rotate(0deg);
+  }
 }
 
 /* Top bar styles */
