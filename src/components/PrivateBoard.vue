@@ -273,12 +273,6 @@ export default {
         const totalDeltaMs = Math.abs(eventTime.getTime() - createdAt.getTime());
         const remainingDeltaMs = Math.abs(eventTime.getTime() - now.getTime());
         
-        // If event has passed, use a default smaller size
-        if (now > eventTime) {
-          console.log(`Event ${item.event_name} has passed, using minimum size`);
-          return 200; // Minimum size for past events
-        }
-        
         // Calculate urgency ratio (0 = just created, 1 = about to happen)
         const urgencyRatio = totalDeltaMs > 0 ? 
           Math.max(0, Math.min(1, 1 - (remainingDeltaMs / totalDeltaMs))) : 0;
@@ -314,6 +308,7 @@ export default {
         const querySnapshot = await getDocs(collection(db, 'bubbles'));
         this.sections.forEach((s) => (s.items = [])); // Reset sections
         this.allBubblesData = []; // Reset all bubbles data
+        const now = new Date();
 
         querySnapshot.forEach((doc) => {
           const d = doc.data();
@@ -329,12 +324,18 @@ export default {
             colorClass: this.getColorForType(type)
           };
 
-          // Add to allBubblesData for filtering and liked modal
-          this.allBubblesData.push(item);
+          // Only add bubbles where the event date hasn't passed yet
+          const eventTime = new Date(item.event_when || item.event_time);
+          if (eventTime > now) {
+            // Add to allBubblesData for filtering and liked modal
+            this.allBubblesData.push(item);
 
-          if (type.includes('favour')) this.sections[0].items.push(item);
-          else if (type.includes('question')) this.sections[1].items.push(item);
-          else this.sections[2].items.push(item);
+            if (type.includes('favour')) this.sections[0].items.push(item);
+            else if (type.includes('question')) this.sections[1].items.push(item);
+            else this.sections[2].items.push(item);
+          } else {
+            console.log(`Filtering out expired event: ${item.event_name} (${eventTime.toLocaleString()})`);
+          }
         });
 
         this.generateNonOverlappingLayout();
