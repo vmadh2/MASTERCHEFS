@@ -25,7 +25,7 @@
         </div>
   
         <button class="btn btn--primary" type="button" @click="openCreate">+ Add Event</button>
-        <button class="btn" @click="resetDemo">Reset demo</button>
+        <button class="btn" @click="resetDemo">Reset</button>
       </div>
   
       <!-- Private sub-tabs -->
