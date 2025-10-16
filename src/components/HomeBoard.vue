@@ -1,8 +1,8 @@
 <template>
-  <!-- Top bar (fixed) matching provided design -->
+  <!-- Top bar (fixed) with Richard's improved styling -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="topbar-title">"THE INTERACTIVE BULLETIN"</div>
+      <div class="topbar-title">THE INTERACTIVE BULLETIN</div>
       <router-link :to="{ name: 'form-sheet' }" class="login-btn" role="button" aria-label="Open form sheet">
         Post
       </router-link>
@@ -46,6 +46,7 @@
       <div class="debug-info">
         <p>Listening for speed data: {{ speedListener ? 'Active' : 'Inactive' }}</p>
         <p>Current bubble limit: {{ bubbleLimit || 'Default (5)' }}</p>
+        <p>Bubbles displayed: {{ positionedItems.length }}</p>
         <p>Last speed timestamp: {{ lastSpeedTimestamp ? new Date(lastSpeedTimestamp).toLocaleTimeString() : 'None' }}</p>
       </div>
 
@@ -56,11 +57,52 @@
 
 
 
-      <div v-if="selectedItem" class="details">
-        <h3>Details for {{ selectedItem.event_name }}</h3>
-        <!-- Displaying the raw data for debugging -->
-        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
-        <button @click="selectedItem = null">Close</button>
+      <!-- Richard's Beautiful Details Modal -->
+      <div v-if="selectedItem" class="details-overlay" @click.self="selectedItem = null">
+        <div class="details-card">
+          <div class="details-header">
+            <h3>{{ selectedItem.fullData.event_title }}</h3>
+            <button @click="selectedItem = null" class="close-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="details-body">
+            <p>{{ selectedItem.fullData.description }}</p>
+          </div>
+          <div class="details-meta">
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-user">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span>Posted by: <strong>{{ selectedItem.fullData.author_name }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="feather-calendar">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span>Event on: <strong>{{ formatDetailedTime(selectedItem.event_time) }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-mail">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <span>Contact: <strong>{{ selectedItem.fullData.author_contact }}</strong></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -366,7 +408,9 @@ export default {
         // Calculate dynamic size based on time delta
         const bubbleSize = this.calculateBubbleSize(item);
         
-        const position = this.findValidPosition(placedBubbles, bubbleSize, containerWidth, containerHeight);
+        // Use Richard's fixed bubble size
+        const fixedSize = 160;
+        const position = this.findValidPosition(placedBubbles, fixedSize, containerWidth, containerHeight);
 
         if (position) {
           placedBubbles.push({
@@ -375,13 +419,9 @@ export default {
               left: `${(position.x / containerWidth) * 100}%`,
               top: `${(position.y / containerHeight) * 100}%`,
             },
-            dynamicStyle: {
-              width: `${bubbleSize}px`,
-              height: `${bubbleSize}px`,
-            },
             px: position.x,
             py: position.y,
-            diameter: bubbleSize
+            diameter: fixedSize
           });
         }
       });
@@ -391,13 +431,32 @@ export default {
     },
 
     findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
-      const maxTries = 100;
+      const maxTries = 200; // Increased attempts for better placement
       const radius = diameter / 2;
-      const padding = 15;
+      const padding = 20; // Increased padding between bubbles
+      
+      // Safe zone boundaries (container is already constrained by fixed positioning)
+      const sideMargin = 20;   // Margin from screen edges
+      
+      // Calculate safe positioning area
+      const safeLeft = sideMargin + radius;
+      const safeRight = containerWidth - sideMargin - radius;
+      const safeTop = radius + 10; // Small top buffer
+      const safeBottom = containerHeight - radius - 10; // Small bottom buffer
+      
+      // Ensure we have a valid safe area
+      const safeWidth = safeRight - safeLeft;
+      const safeHeight = safeBottom - safeTop;
+      
+      if (safeWidth <= 0 || safeHeight <= 0) {
+        console.warn('Safe area too small for bubble placement');
+        return null;
+      }
 
       for (let i = 0; i < maxTries; i++) {
-        const x = Math.random() * (containerWidth - diameter) + radius;
-        const y = Math.random() * (containerHeight - diameter) + radius;
+        // Generate random position within safe boundaries
+        const x = Math.random() * safeWidth + safeLeft;
+        const y = Math.random() * safeHeight + safeTop;
 
         let hasOverlap = false;
         for (const placed of placedBubbles) {
@@ -411,17 +470,83 @@ export default {
             break;
           }
         }
-        if (!hasOverlap) return { x, y };
+        
+        if (!hasOverlap) {
+          console.log(`Bubble placed at safe position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+          return { x, y };
+        }
       }
       
-      // Fallback if no valid position is found
+      // Improved fallback: use grid-based positioning if random fails
+      console.warn('Random placement failed, using grid fallback');
+      return this.findGridPosition(placedBubbles, diameter, containerWidth, containerHeight);
+    },
+
+    findGridPosition(placedBubbles, diameter, containerWidth, containerHeight) {
+      const radius = diameter / 2;
+      const padding = 20;
+      
+      // Safe zone boundaries (container is already constrained by fixed positioning)
+      const sideMargin = 20;
+      
+      const safeLeft = sideMargin + radius;
+      const safeRight = containerWidth - sideMargin - radius;
+      const safeTop = radius + 10;
+      const safeBottom = containerHeight - radius - 10;
+      
+      // Create a grid of potential positions
+      const gridSpacing = diameter + padding;
+      const cols = Math.floor((safeRight - safeLeft) / gridSpacing);
+      const rows = Math.floor((safeBottom - safeTop) / gridSpacing);
+      
+      // Try each grid position
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = safeLeft + (col * gridSpacing);
+          const y = safeTop + (row * gridSpacing);
+          
+          // Check if this position overlaps with any existing bubble
+          let hasOverlap = false;
+          for (const placed of placedBubbles) {
+            const dx = x - placed.px;
+            const dy = y - placed.py;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (radius + placed.diameter / 2) + padding;
+
+            if (distance < minDistance) {
+              hasOverlap = true;
+              break;
+            }
+          }
+          
+          if (!hasOverlap) {
+            console.log(`Grid placement successful at: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+            return { x, y };
+          }
+        }
+      }
+      
+      // Ultimate fallback: center position
+      console.warn('Grid placement also failed, using center fallback');
       return {
-        x: Math.random() * (containerWidth - diameter) + radius,
-        y: Math.random() * (containerHeight - diameter) + radius
+        x: containerWidth / 2,
+        y: containerHeight / 2
       };
     },
 
     // --- HELPERS ---
+    debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    },
+
     getColorForType(type) {
       if (type.includes('favour')) return 'is-pastel-red';
       if (type.includes('question')) return 'is-pastel-blue';
@@ -450,7 +575,18 @@ export default {
     formatTime(timestamp) {
       if (!timestamp) return '';
       const date = new Date(timestamp);
-      return date.toLocaleString(); // Adjust format as needed
+      return date.toLocaleDateString('en-AU'); // Richard's improved format
+    },
+
+    // Richard's detailed formatter for the modal
+    formatDetailedTime(iso) {
+      if (!iso) return 'Not specified';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Invalid Date';
+      return d.toLocaleString('en-AU', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+      });
     }
   },
 
@@ -459,7 +595,14 @@ export default {
     console.log('🚀 HomeBoard mounted, fetching bubbles...');
     
     this.fetchBubbles();
-    window.addEventListener('resize', this.generateNonOverlappingLayout);
+    
+    // Debounced resize handler to prevent excessive recalculations
+    this.resizeHandler = this.debounce(() => {
+      console.log('🔄 Window resized, repositioning bubbles...');
+      this.generateNonOverlappingLayout();
+    }, 300);
+    
+    window.addEventListener('resize', this.resizeHandler);
     
     // Set up speed monitoring after initial load
     console.log('Setting up speed listener in 2 seconds...');
@@ -470,7 +613,11 @@ export default {
 
   beforeUnmount() {
     console.log('HomeBoard unmounting, cleaning up...');
-    window.removeEventListener('resize', this.generateNonOverlappingLayout);
+    
+    // Clean up resize listener
+    if (this.resizeHandler) {
+      window.removeEventListener('resize', this.resizeHandler);
+    }
     
     // Clean up listeners and timers
     if (this.speedListener) {
@@ -487,6 +634,14 @@ export default {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+:global(body) {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Speed Notification Styles */
 .speed-notification {
   position: fixed;
@@ -530,8 +685,6 @@ export default {
   color: #a0aec0;
 }
 
-
-
 /* Debug Info Styles */
 .debug-info {
   position: fixed;
@@ -565,18 +718,22 @@ export default {
   cursor: pointer;
 }
 
-/* Main layout styles */
+/* Richard's Complete Styling */
 .hero.is-light {
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0;
+  margin: 0;
   height: 100vh;
+  background-color: #f7f9fc;
+  background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23dce7f0" fill-opacity="0.4"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
 }
 
 .content-container {
-  padding-top: 72px;
-  padding-bottom: 72px;
-  position: relative;
-  height: 100vh;
+  position: fixed;
+  top: 72px;
+  bottom: 72px;
+  left: 0;
+  right: 0;
+  padding: 20px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -592,160 +749,207 @@ export default {
 
 .list-item {
   position: absolute;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 10px 25px rgba(45, 55, 72, 0.08);
   cursor: pointer;
-  transform: translate(-50%, -50%);
   animation: float 8s ease-in-out infinite alternate;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .list-item:hover {
-  transform: translate(-50%, -50%) scale(1.05);
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.06), 0 20px 40px rgba(45, 55, 72, 0.1);
+}
+
+/* Speed Detection Enhancement */
+.list-item.speed-detected {
+  animation: float 8s ease-in-out infinite alternate, 
+             speedPulse 1.5s infinite,
+             speedGlow 2s ease-in-out infinite alternate;
+  border: 3px solid #10b981;
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.5),
+              0 6px 25px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes speedPulse {
+  0% { 
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5),
+                0 6px 25px rgba(0, 0, 0, 0.2); 
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.8),
+                0 8px 30px rgba(0, 0, 0, 0.25); 
+  }
+  100% { 
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5),
+                0 6px 25px rgba(0, 0, 0, 0.2); 
+  }
+}
+
+@keyframes speedGlow {
+  from {
+    border-color: #10b981;
+  }
+  to {
+    border-color: #34d399;
+  }
 }
 
 .item-title {
   font-weight: 600;
   color: white;
-  font-size: 1em;
-  line-height: 1.2;
-  padding: 0 12px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  font-size: 1.05em;
+  line-height: 1.3;
+  padding: 0 15px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.25);
+  margin-bottom: 4px;
 }
 
 .item-time {
+  font-weight: 400;
   font-size: 0.8em;
   color: white;
-  margin-top: 5px;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .empty {
-  color: #888;
+  color: #a0aec0;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.details {
-  position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
-  max-width: 600px;
-  padding: 16px;
-  border-radius: 12px;
-  background: white;
-  z-index: 1001;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-}
-
-.details pre {
-  background: #f1f1f1;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-  max-height: 200px;
-}
-
-/* Category Colors */
-.is-pastel-red {
-  background: linear-gradient(135deg, #ff8a80, #ff5252);
-  /* Favour */
-}
-
-.is-pastel-blue {
-  background: linear-gradient(135deg, #40c4ff, #0091ea);
-  /* Question */
-}
-
-.is-pastel-green {
-  background: linear-gradient(135deg, #69f0ae, #00c853);
-  /* Announcement */
-}
-
-/* Animation */
-@keyframes float {
-  from {
-    transform: translate(-25%, -25%) translateY(0px) rotate(0deg);
-  }
-
-  to {
-    transform: translate(-25%, -25%) translateY(-20px) rotate(0deg);
-  }
-}
-
-/* Top/Bottom Bars */
-.topbar {
+/* Details modal styles */
+.details-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 72px;
-  background: #8de3ea;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06) inset;
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.topbar-inner {
-  width: 100%;
-  max-width: 1100px;
+  bottom: 0;
+  background-color: rgba(10, 20, 30, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  padding: 0 18px;
-  box-sizing: border-box;
+  z-index: 1002;
+  backdrop-filter: blur(8px);
 }
 
-.topbar-title {
-  font-size: 20px;
-  color: #073642;
+.details-card {
+  width: 90%;
+  max-width: 500px;
+  padding: 24px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.3s ease-out;
 }
 
-.login-btn,
-.test-btn {
-  height: 48px;
-  border-radius: 10px;
-  color: white;
-  font-weight: 700;
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.details-header h3 {
+  margin: 0;
+  font-size: 1.4em;
+  color: #2d3748;
+  line-height: 1.3;
+}
+
+.close-btn {
+  background: none;
   border: none;
   cursor: pointer;
+  color: #a0aec0;
+  padding: 4px;
+}
+
+.close-btn:hover {
+  color: #4a5568;
+}
+
+.details-body p {
+  margin: 0 0 20px 0;
+  color: #4a5568;
+  font-size: 1em;
+  line-height: 1.6;
+}
+
+.details-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0 20px;
-  box-shadow: 4px 6px 8px rgba(0, 0, 0, 0.15);
-  position: absolute;
-  top: 12px;
+  gap: 10px;
+  font-size: 0.9em;
+  color: #718096;
 }
 
-.login-btn {
-  right: 18px;
-  background: #48c0c8;
+.meta-item svg {
+  flex-shrink: 0;
 }
 
-.test-btn {
-  right: 96px;
-  background: #ffd166;
-  color: #073642;
+.meta-item strong {
+  color: #2d3748;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Richard's color scheme */
+.is-pastel-red {
+  background: linear-gradient(145deg, #FF9A8B, #FF6A88);
+}
+
+.is-pastel-blue {
+  background: linear-gradient(145deg, #89CFF0, #6495ED);
+}
+
+.is-pastel-green {
+  background: linear-gradient(145deg, #98FB98, #55C595);
+}
+
+/* Richard's float animation */
+@keyframes float {
+  from {
+    transform: translate(-50%, -50%) translateY(0px) rotate(-3deg);
+  }
+  to {
+    transform: translate(-50%, -50%) translateY(-20px) rotate(3deg);
+  }
+}
+
+/* Top/Bottom Bars - Richard's styling */
+.topbar,
 .bottombar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
   height: 72px;
   background: #8de3ea;
   z-index: 1000;
@@ -754,26 +958,83 @@ export default {
   align-items: center;
 }
 
+.topbar {
+  top: 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.bottombar {
+  bottom: 0;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-inner,
 .bottombar-inner {
   width: 100%;
   max-width: 1100px;
   height: 100%;
   display: flex;
   align-items: center;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
+.topbar-inner {
+  justify-content: center;
+  position: relative;
+}
+
+.bottombar-inner {
   justify-content: flex-end;
   gap: 12px;
-  padding-right: 18px;
-  box-sizing: border-box;
+}
+
+.topbar-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #073642;
+}
+
+.login-btn,
+.test-btn {
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  position: absolute;
+  top: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.login-btn:active,
+.test-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.login-btn {
+  right: 18px;
+  background: #48c0c8;
+  color: white;
+}
+
+.test-btn {
+  right: 122px;
+  background: #ffffff;
+  color: #48c0c8;
+  border: 1px solid #b2e9ed;
 }
 
 .bottombar-left,
 .bottombar-right {
   color: #073642;
-}
-
-.bottombar-toggle {
-  display: flex;
-  align-items: center;
+  font-weight: 600;
 }
 
 .toggle-track {
@@ -785,6 +1046,7 @@ export default {
   display: flex;
   align-items: center;
   padding: 2px;
+  cursor: pointer;
 }
 
 .toggle-thumb {

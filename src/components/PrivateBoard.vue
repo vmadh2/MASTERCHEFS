@@ -1,4 +1,5 @@
 <template>
+  <div class="private-board-wrapper">
   <!-- Top bar (fixed) matching provided design -->
   <header class="topbar">
     <div class="topbar-inner">
@@ -36,8 +37,8 @@
     </div>
 
     <div class="filter-stats">
-      Showing {{ filteredItems.length }} of {{ allBubblesData.length }} bubbles
-      | ❤️ {{ likedBubbles.size }} liked
+      Showing {{ positionedItems.length }} of {{ filteredItems.length }} filtered 
+      ({{ allBubblesData.length }} total) | ❤️ {{ likedBubbles.size }} liked
     </div>
   </div>
 
@@ -100,31 +101,60 @@
         </div>
       </div>
 
-      <div v-if="selectedItem" class="details">
-        <h3>Details for {{ selectedItem.event_name }}</h3>
-        <!-- Displaying the raw data for debugging -->
-        <pre>{{ JSON.stringify(selectedItem.fullData, null, 2) }}</pre>
-        <button @click="selectedItem = null">Close</button>
+      <!-- Richard's Beautiful Details Modal -->
+      <div v-if="selectedItem" class="details-overlay" @click.self="selectedItem = null">
+        <div class="details-card">
+          <div class="details-header">
+            <h3>{{ selectedItem.fullData.event_title }}</h3>
+            <button @click="selectedItem = null" class="close-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="details-body">
+            <p>{{ selectedItem.fullData.description }}</p>
+          </div>
+          <div class="details-meta">
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-user">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span>Posted by: <strong>{{ selectedItem.fullData.author_name }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="feather-calendar">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span>Event on: <strong>{{ formatDetailedTime(selectedItem.event_time) }}</strong></span>
+            </div>
+            <div class="meta-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-mail">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <span>Contact: <strong>{{ selectedItem.fullData.author_contact }}</strong></span>
+            </div>
+            <div v-if="isLiked(selectedItem.id)" class="meta-item">
+              <span style="color: #e53e3e; font-weight: 600;">❤️ Liked Event</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Bubble Details Modal -->
-  <div v-if="selectedBubble" class="bubble-modal" @click.self="selectedBubble = null">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>{{ selectedBubble.event_name }}</h3>
-        <button @click="selectedBubble = null" class="close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p><strong>Time:</strong> {{ formatTime(selectedBubble.event_time) }}</p>
-        <p><strong>Type:</strong> {{ getBubbleType(selectedBubble) }}</p>
-        <div class="liked-indicator">
-          <span>❤️ Liked Bubble</span>
-        </div>
-      </div>
-    </div>
-  </div>
+
 
   <!-- Bottom bar (fixed) - FIXED TOGGLE POSITIONING -->
   <footer class="bottombar">
@@ -145,6 +175,7 @@
       <div class="bottombar-right">Private</div>
     </div>
   </footer>
+  </div>
 </template>
 
 <script>
@@ -217,10 +248,13 @@ export default {
       // Save to localStorage
       this.saveLikesToStorage();
       
-      // Regenerate layout to reflect filtering changes
-      this.generateNonOverlappingLayout();
+      // Only regenerate layout if we're filtering by liked status
+      // This prevents unnecessary repositioning when just liking/unliking
+      if (this.likedFilter !== 'all') {
+        this.generateNonOverlappingLayout();
+      }
       
-      // Force reactivity update
+      // Force reactivity update for like buttons and counters
       this.$forceUpdate();
     },
 
@@ -256,7 +290,12 @@ export default {
       if (confirm('Are you sure you want to clear all liked bubbles?')) {
         this.likedBubbles.clear();
         this.saveLikesToStorage();
-        this.generateNonOverlappingLayout(); // Regenerate layout
+        
+        // Only regenerate layout if we're filtering by liked status
+        if (this.likedFilter !== 'all') {
+          this.generateNonOverlappingLayout();
+        }
+        
         this.$forceUpdate();
         console.log('Cleared all likes');
       }
@@ -349,76 +388,173 @@ export default {
     // --- LAYOUT & COLLISION AVOIDANCE ---
     generateNonOverlappingLayout() {
       const container = this.$refs.contentContainer;
-      if (!container) return;
+      if (!container) {
+        console.warn('Container not found for bubble positioning');
+        return;
+      }
 
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
       
+      console.log(`Container dimensions: ${containerWidth}x${containerHeight}`);
+      
       // Use filtered items instead of all items
-      const itemsToPlace = this.filteredItems.slice(0, 10); // Show up to 10 filtered items
+      const itemsToPlace = this.filteredItems.slice(0, 8); // Reduced to 8 for better spacing
 
       const placedBubbles = [];
 
-      itemsToPlace.forEach(item => {
-        // Calculate dynamic size based on time delta
-        const bubbleSize = this.calculateBubbleSize(item);
-        
-        const position = this.findValidPosition(placedBubbles, bubbleSize, containerWidth, containerHeight);
+      itemsToPlace.forEach((item, index) => {
+        // Use Richard's fixed bubble size
+        const fixedSize = 160;
+        const position = this.findValidPosition(placedBubbles, fixedSize, containerWidth, containerHeight);
 
         if (position) {
+          // Convert to percentage positioning but keep pixel values for collision detection
+          const leftPercent = (position.x / containerWidth) * 100;
+          const topPercent = (position.y / containerHeight) * 100;
+          
           placedBubbles.push({
             ...item,
             position: {
-              left: `${(position.x / containerWidth) * 100}%`,
-              top: `${(position.y / containerHeight) * 100}%`,
-            },
-            dynamicStyle: {
-              width: `${bubbleSize}px`,
-              height: `${bubbleSize}px`,
+              left: `${leftPercent}%`,
+              top: `${topPercent}%`,
             },
             px: position.x,
             py: position.y,
-            diameter: bubbleSize
+            diameter: fixedSize
           });
+          
+          console.log(`Placed bubble ${index + 1}: ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%`);
+        } else {
+          console.warn(`Failed to place bubble ${item.event_name}`);
         }
       });
       
       // Set the positioned items
       this.positionedItems = placedBubbles;
+      console.log(`Total bubbles placed: ${placedBubbles.length} out of ${itemsToPlace.length}`);
     },
 
     findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
-      const maxTries = 100;
       const radius = diameter / 2;
-      const padding = 15;
+      const padding = 30; // Increased padding for better spacing
+      
+      // Safe zone boundaries - more conservative margins
+      const sideMargin = 30;
+      const topMargin = 30;
+      const bottomMargin = 30;
+      
+      // Calculate safe positioning area
+      const safeLeft = sideMargin + radius;
+      const safeRight = containerWidth - sideMargin - radius;
+      const safeTop = topMargin + radius;
+      const safeBottom = containerHeight - bottomMargin - radius;
+      
+      const safeWidth = safeRight - safeLeft;
+      const safeHeight = safeBottom - safeTop;
+      
+      console.log(`Safe area: ${safeWidth}x${safeHeight} (${safeLeft}, ${safeTop} to ${safeRight}, ${safeBottom})`);
+      
+      if (safeWidth <= 0 || safeHeight <= 0) {
+        console.warn('Safe area too small for bubble placement');
+        return null;
+      }
 
+      // Try grid-based placement first for more predictable results
+      const gridPosition = this.findGridPosition(placedBubbles, diameter, containerWidth, containerHeight);
+      if (gridPosition) {
+        return gridPosition;
+      }
+
+      // Fallback to random placement with fewer attempts
+      const maxTries = 50;
       for (let i = 0; i < maxTries; i++) {
-        const x = Math.random() * (containerWidth - diameter) + radius;
-        const y = Math.random() * (containerHeight - diameter) + radius;
+        const x = Math.random() * safeWidth + safeLeft;
+        const y = Math.random() * safeHeight + safeTop;
 
-        let hasOverlap = false;
-        for (const placed of placedBubbles) {
-          const dx = x - placed.px;
-          const dy = y - placed.py;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const minDistance = (radius + placed.diameter / 2) + padding;
-
-          if (distance < minDistance) {
-            hasOverlap = true;
-            break;
-          }
+        if (this.isPositionValid(x, y, radius, placedBubbles, padding)) {
+          console.log(`Random placement successful: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+          return { x, y };
         }
-        if (!hasOverlap) return { x, y };
       }
       
-      // Fallback if no valid position is found
-      return {
-        x: Math.random() * (containerWidth - diameter) + radius,
-        y: Math.random() * (containerHeight - diameter) + radius
-      };
+      console.warn('All placement attempts failed');
+      return null;
+    },
+
+    findGridPosition(placedBubbles, diameter, containerWidth, containerHeight) {
+      const radius = diameter / 2;
+      const padding = 30;
+      
+      // Safe zone boundaries - match the main positioning logic
+      const sideMargin = 30;
+      const topMargin = 30;
+      const bottomMargin = 30;
+      
+      const safeLeft = sideMargin + radius;
+      const safeRight = containerWidth - sideMargin - radius;
+      const safeTop = topMargin + radius;
+      const safeBottom = containerHeight - bottomMargin - radius;
+      
+      // Create a more flexible grid
+      const gridSpacing = diameter + padding;
+      const cols = Math.max(1, Math.floor((safeRight - safeLeft) / gridSpacing));
+      const rows = Math.max(1, Math.floor((safeBottom - safeTop) / gridSpacing));
+      
+      console.log(`Grid: ${cols}x${rows}, spacing: ${gridSpacing}`);
+      
+      // Create array of all grid positions and shuffle them for variety
+      const positions = [];
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = safeLeft + (col * gridSpacing) + (Math.random() - 0.5) * 20; // Add small random offset
+          const y = safeTop + (row * gridSpacing) + (Math.random() - 0.5) * 20;
+          positions.push({ x, y });
+        }
+      }
+      
+      // Shuffle positions for variety
+      positions.sort(() => Math.random() - 0.5);
+      
+      // Try each grid position
+      for (const pos of positions) {
+        if (this.isPositionValid(pos.x, pos.y, radius, placedBubbles, padding)) {
+          console.log(`Grid placement successful at: x=${pos.x.toFixed(1)}, y=${pos.y.toFixed(1)}`);
+          return pos;
+        }
+      }
+      
+      console.warn('Grid placement failed');
+      return null;
+    },
+
+    isPositionValid(x, y, radius, placedBubbles, padding) {
+      for (const placed of placedBubbles) {
+        const dx = x - placed.px;
+        const dy = y - placed.py;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const minDistance = (radius + placed.diameter / 2) + padding;
+
+        if (distance < minDistance) {
+          return false;
+        }
+      }
+      return true;
     },
 
     // --- HELPERS ---
+    debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    },
+
     getColorForType(type) {
       if (type.includes('favour')) return 'is-pastel-red';
       if (type.includes('question')) return 'is-pastel-blue';
@@ -447,7 +583,18 @@ export default {
     formatTime(timestamp) {
       if (!timestamp) return '';
       const date = new Date(timestamp);
-      return date.toLocaleString(); // Adjust format as needed
+      return date.toLocaleDateString('en-AU'); // Richard's improved format
+    },
+
+    // Richard's detailed formatter for the modal
+    formatDetailedTime(iso) {
+      if (!iso) return 'Not specified';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Invalid Date';
+      return d.toLocaleString('en-AU', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+      });
     }
   },
 
@@ -468,17 +615,58 @@ export default {
     this.loadLikesFromStorage();
     
     this.fetchBubbles();
-    window.addEventListener('resize', this.generateNonOverlappingLayout);
+    
+    // Debounced resize handler to prevent excessive recalculations
+    this.resizeHandler = this.debounce(() => {
+      console.log('🔄 PrivateBoard window resized, repositioning bubbles...');
+      this.generateNonOverlappingLayout();
+    }, 300);
+    
+    window.addEventListener('resize', this.resizeHandler);
+    
+    // Ensure layout is generated after DOM is fully rendered
+    this.$nextTick(() => {
+      setTimeout(() => {
+        this.generateNonOverlappingLayout();
+      }, 100);
+    });
   },
 
   beforeUnmount() {
     console.log('PrivateBoard unmounting, cleaning up...');
-    window.removeEventListener('resize', this.generateNonOverlappingLayout);
+    
+    // Clean up resize listener
+    if (this.resizeHandler) {
+      window.removeEventListener('resize', this.resizeHandler);
+    }
   }
 };
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+:global(body) {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Private Board Wrapper - Force complete background coverage */
+.private-board-wrapper {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: #8b9dc3 !important;
+  background-image: url('data:image/svg+xml,%3Csvg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%23dbe7fd" fill-opacity="0.6" fill-rule="evenodd"%3E%3Cpath d="M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z"/%3E%3C/g%3E%3C/svg%3E') !important;
+  z-index: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Filter Bar Styles */
 .filter-bar {
   position: fixed;
@@ -735,20 +923,124 @@ export default {
   background: #ff3742;
 }
 
-/* Main layout styles */
+/* Richard's Beautiful Details Modal Styles */
+.details-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(10, 20, 30, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  backdrop-filter: blur(8px);
+}
+
+.details-card {
+  width: 90%;
+  max-width: 500px;
+  padding: 24px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.details-header h3 {
+  margin: 0;
+  font-size: 1.4em;
+  color: #2d3748;
+  line-height: 1.3;
+}
+
+.details-header .close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #a0aec0;
+  padding: 4px;
+}
+
+.details-header .close-btn:hover {
+  color: #4a5568;
+}
+
+.details-body p {
+  margin: 0 0 20px 0;
+  color: #4a5568;
+  font-size: 1em;
+  line-height: 1.6;
+}
+
+.details-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9em;
+  color: #718096;
+}
+
+.meta-item svg {
+  flex-shrink: 0;
+}
+
+.meta-item strong {
+  color: #2d3748;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Main layout styles with Richard's background - force override */
 .hero.is-light {
-  padding-top: 0;
-  padding-bottom: 0;
-  height: 100vh;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100vh !important;
+  background-color: #8b9dc3 !important;
+  background-image: url('data:image/svg+xml,%3Csvg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%23dbe7fd" fill-opacity="0.6" fill-rule="evenodd"%3E%3Cpath d="M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z"/%3E%3C/g%3E%3C/svg%3E') !important;
+}
+
+/* Force override global body background for this component */
+:global(body) {
+  background-color: #8b9dc3 !important;
 }
 
 .content-container {
-  padding-top: 132px; /* Account for topbar (72px) + filter bar (60px) */
-  padding-bottom: 72px;
-  position: relative;
-  height: 100vh;
-  box-sizing: border-box;
-  overflow: hidden;
+  position: fixed !important;
+  top: 144px !important;
+  bottom: 84px !important;
+  left: 12px !important;
+  right: 12px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  background: transparent !important;
+  z-index: 1 !important;
 }
 
 .list {
@@ -762,93 +1054,75 @@ export default {
 
 .list-item {
   position: absolute;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 10px 25px rgba(45, 55, 72, 0.08);
   cursor: pointer;
+  animation: float 10s ease-in-out infinite alternate;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  /* Center the bubble on its position coordinates */
   transform: translate(-50%, -50%);
-  animation: float 8s ease-in-out infinite alternate;
-  transition: transform 0.3s ease;
 }
 
 .list-item:hover {
-  transform: translate(-50%, -50%) scale(1.05);
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.06), 0 20px 40px rgba(45, 55, 72, 0.1);
 }
 
 .item-title {
   font-weight: 600;
   color: white;
-  font-size: 1em;
-  line-height: 1.2;
-  padding: 0 12px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  font-size: 1.05em;
+  line-height: 1.3;
+  padding: 0 15px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.25);
+  margin-bottom: 4px;
 }
 
 .item-time {
+  font-weight: 400;
   font-size: 0.8em;
   color: white;
-  margin-top: 5px;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .empty {
-  color: #888;
+  color: #a0aec0;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.details {
-  position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
-  max-width: 600px;
-  padding: 16px;
-  border-radius: 12px;
-  background: white;
-  z-index: 1001;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-}
 
-.details pre {
-  background: #f1f1f1;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-  max-height: 200px;
-}
 
-/* Category Colors */
+/* Richard's color scheme */
 .is-pastel-red {
-  background: linear-gradient(135deg, #ff8a80, #ff5252);
-  /* Favour */
+  background: linear-gradient(145deg, #FF9A8B, #FF6A88);
 }
 
 .is-pastel-blue {
-  background: linear-gradient(135deg, #40c4ff, #0091ea);
-  /* Question */
+  background: linear-gradient(145deg, #89CFF0, #6495ED);
 }
 
 .is-pastel-green {
-  background: linear-gradient(135deg, #69f0ae, #00c853);
-  /* Announcement */
+  background: linear-gradient(145deg, #98FB98, #55C595);
 }
 
-/* Animation */
+/* Richard's PrivateBoard float animation - centered positioning */
 @keyframes float {
-  from {
-    transform: translate(-25%, -25%) translateY(0px) rotate(0deg);
+  from { 
+    transform: translate(-50%, -50%) translateY(0px); 
   }
-
-  to {
-    transform: translate(-25%, -25%) translateY(-20px) rotate(0deg);
+  to { 
+    transform: translate(-50%, -50%) translateY(-15px); 
   }
 }
 
