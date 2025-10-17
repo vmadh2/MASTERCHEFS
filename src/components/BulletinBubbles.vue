@@ -24,6 +24,8 @@
           </button>
         </div>
   
+
+        
         <button class="btn btn--primary" type="button" @click="openCreate">+ Add Event</button>
         <button class="btn" @click="resetDemo">Reset</button>
       </div>
@@ -136,6 +138,11 @@
               </select>
             </label>
   
+            <label class="row">
+              <span>Event Date</span>
+              <input class="input" type="datetime-local" v-model="createForm.eventDate" />
+            </label>
+
             <div class="row">
               <label class="chip">
                 <input type="checkbox" v-model="createForm.remoteFriendly" />
@@ -159,15 +166,14 @@
   
   <script setup>
   import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from "vue";
+  import { db, bubblesCollection, Timestamp } from '../firebase.js';
+  import { addDoc, onSnapshot, getDocs, query, orderBy } from 'firebase/firestore';
   
   /* ===== Category palette ===== */
   const CATEGORIES = [
-    { key: "social", label: "Social", color: "#8b5cf6" },
-    { key: "learning", label: "Learning", color: "#3b82f6" },
-    { key: "sport", label: "Sport", color: "#22c55e" },
-    { key: "reading", label: "Reading", color: "#f43f5e" },
-    { key: "kudos", label: "Kudos", color: "#f59e0b" },
-    { key: "other", label: "Other", color: "#06b6d4" },
+    { key: "question", label: "Question", color: "#3b82f6" },
+    { key: "favour", label: "Favour", color: "#22c55e" },
+    { key: "announcement", label: "Announcement", color: "#8b5cf6" },
   ];
   const categoryMeta = Object.fromEntries(CATEGORIES.map(c => [c.key, c]));
   const categoryLabel = key => categoryMeta[key]?.label ?? "Other";
@@ -178,6 +184,23 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const radiusFromAttendees = (n) => 36 + Math.sqrt(Math.max(0, n)) * 10;
   
+  // Calculate urgency-based size multiplier
+  const getUrgencyMultiplier = (eventDate) => {
+    if (!eventDate) return 1;
+    
+    const now = new Date();
+    const event = eventDate.toDate ? eventDate.toDate() : new Date(eventDate);
+    const timeDiff = event.getTime() - now.getTime();
+    const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+    
+    // Size based on proximity: larger when closer to event
+    if (daysDiff < 0) return 0.8; // Past events smaller
+    if (daysDiff < 1) return 1.5; // Less than 1 day - very large
+    if (daysDiff < 3) return 1.3; // Less than 3 days - large  
+    if (daysDiff < 7) return 1.1; // Less than 1 week - slightly larger
+    return 1; // Default size for distant events
+  };
+  
   /* seeds */
   const sample = [
     { title: "Friday Coffee Run ☕", desc: "Mid-morning break at the lobby cafe.", category: "social", attendees: 7, remoteFriendly: false, owner: "me", likes: 2, likedBy: ["alice","bob"], joinedBy: [] },
@@ -187,31 +210,79 @@
     { title: "Friday ‘Wins’ Wall", desc: "Drop your weekly win!", category: "kudos", attendees: 22, remoteFriendly: true, owner: "sara", likes: 0, likedBy: [], joinedBy: [] },
   ];
   
-  /* storage */
-  const LSKEY = "bulletin:bubbles";
-  function load() {
-    try {
-      const raw = localStorage.getItem(LSKEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return sample.map((e, i) => ({
-      id: `seed-${i}`,
-      ...e,
-      x: rand(160, 1000),
-      y: rand(160, 700),
-      vx: rand(-0.8, 0.8),
-      vy: rand(-0.8, 0.8),
-      r: radiusFromAttendees(e.attendees),
-      color: categoryColor(e.category),
-    }));
+  /* Firebase integration */
+  function resetDemo() { 
+    // For demo purposes, could add sample data to Firebase
+    console.log('Reset demo - you could implement this to add sample data to Firebase');
   }
-  function save(val) { try { localStorage.setItem(LSKEY, JSON.stringify(val)); } catch {} }
-  function resetDemo() { localStorage.removeItem(LSKEY); bubbles.value = load(); }
   
   /* state */
   const fieldEl = ref(null);
-  const bubbles = ref(load());
-  watch(bubbles, v => save(v), { deep: true });
+  const bubbles = ref([]);
+  
+  // Firebase listeners
+  function setupFirebaseListeners() {
+    console.log('Setting up Firebase listeners...');
+    
+    // Listen to bubbles collection
+    const bubblesQuery = bubblesCollection;
+    console.log('Creating onSnapshot listener for bubbles collection');
+    
+    onSnapshot(bubblesQuery, 
+      (snapshot) => {
+        const newBubbles = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          // Skip inactive bubbles
+          if (!data.bubble_active) {
+            return;
+          }
+          
+          // Map your Firebase fields to component fields
+          const attendees = data.event_attend?.length || 3;
+          const baseRadius = radiusFromAttendees(attendees);
+          
+          // Map event_type to our category system
+          const categoryMap = {
+            'question': 'question',
+            'favour': 'favour',
+            'announcement': 'announcement'
+          };
+          const category = categoryMap[data.event_type?.toLowerCase()] || 'question';
+          const eventDate = data.event_when || data.eventDate;
+          
+          // Apply urgency-based sizing
+          const urgencyMultiplier = getUrgencyMultiplier(eventDate);
+          const finalRadius = baseRadius * urgencyMultiplier;
+          
+          newBubbles.push({
+            id: doc.id,
+            title: data.event_title || 'Untitled Event',
+            desc: data.description || '',
+            category: category,
+            attendees: attendees,
+            remoteFriendly: data.remoteFriendly || false,
+            owner: data.author_name || 'unknown',
+            likes: data.likes || 0,
+            likedBy: data.likedBy || [],
+            joinedBy: data.joinedBy || [],
+            x: data.x || rand(finalRadius + 4, 1000 - finalRadius - 4),
+            y: data.y || rand(finalRadius + 4, 700 - finalRadius - 4),
+            vx: data.vx || rand(-0.3, 0.3),
+            vy: data.vy || rand(-0.3, 0.3),
+            r: finalRadius,
+            color: categoryColor(category),
+            eventDate: eventDate
+        });
+        });
+      
+      bubbles.value = newBubbles;
+    },
+    (error) => {
+      console.error('❌ Firebase snapshot error:', error);
+      console.error('❌ Error details:', error.message, error.code);
+    });
+  }
   
   const filter = ref("");
   const remoteOnly = ref(false);
@@ -225,17 +296,26 @@
   
   /* physics */
   let raf = 0;
-  function step() {
+  let lastTime = 0;
+  function step(currentTime) {
   const el = fieldEl.value;
   if (!el) { raf = requestAnimationFrame(step); return; }
+  
+  // Throttle to ~30fps to improve performance
+  if (currentTime - lastTime < 33) {
+    raf = requestAnimationFrame(step);
+    return;
+  }
+  lastTime = currentTime;
+  
   const W = el.clientWidth, H = el.clientHeight;
 
   bubbles.value = bubbles.value.map(b => ({ ...b }));
 
   // move + walls
   for (const b of bubbles.value) {
-    b.x += b.vx * 1.2;
-    b.y += b.vy * 1.2;
+    b.x += b.vx * 0.4;
+    b.y += b.vy * 0.4;
     wallBounce(b, W, H);
   }
 
@@ -244,12 +324,26 @@
 
   raf = requestAnimationFrame(step);
 }
-  onMounted(() => raf = requestAnimationFrame(step));
+  onMounted(() => {
+    console.log('🚀 Component mounted, setting up Firebase listeners...');
+    setupFirebaseListeners();
+    console.log('🎬 Starting animation loop...');
+    raf = requestAnimationFrame(step);
+  });
   onBeforeUnmount(() => cancelAnimationFrame(raf));
-  
   /* filters */
   const view = computed(() => {
+    const now = new Date();
+    
     return bubbles.value
+      .filter(b => {
+        // Filter out expired events
+        if (b.eventDate && b.eventDate.toDate) {
+          const eventDate = b.eventDate.toDate();
+          return eventDate >= now;
+        }
+        return true; // Show events without dates
+      })
       .filter(b =>
         filter.value
           ? (b.title + " " + b.desc + " " + categoryLabel(b.category))
@@ -299,41 +393,54 @@
   }
   
   /* create modal logic */
-  const createForm = reactive({ title: "", desc: "", category: "social", attendees: 3, remoteFriendly: true });
+  const createForm = reactive({ title: "", desc: "", category: "question", attendees: 3, remoteFriendly: true, eventDate: "" });
   function openCreate() {
     createForm.title = "";
     createForm.desc = "";
-    createForm.category = "social";
+    createForm.category = "question";
     createForm.attendees = 3;
     createForm.remoteFriendly = true;
+    // Set default event date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    createForm.eventDate = tomorrow.toISOString().slice(0, 16);
     creating.value = true;
   }
   function closeCreate() { creating.value = false; }
-  function saveCreate() {
+  async function saveCreate() {
     const el = fieldEl.value;
     const W = el?.clientWidth ?? 1000;
     const H = el?.clientHeight ?? 700;
     const n = clamp(createForm.attendees || 1, 1, 200);
     const r = radiusFromAttendees(n);
-    const cat = createForm.category || "other";
-    const bubble = {
-      id: crypto.randomUUID(),
-      title: createForm.title.trim() || "Untitled",
-      desc: createForm.desc.trim(),
-      category: cat,
-      attendees: n,
-      remoteFriendly: !!createForm.remoteFriendly,
-      owner: currentUser,
-      likes: 0, likedBy: [], joinedBy: [],
-      x: rand(r + 4, Math.max(r + 5, W - r - 5)),
-      y: rand(r + 4, Math.max(r + 5, H - r - 5)),
-      vx: rand(-1, 1) || 0.4,
-      vy: rand(-1, 1) || -0.3,
-      r,
-      color: categoryColor(cat),
-    };
-    bubbles.value = [bubble, ...bubbles.value];
-    creating.value = false;
+    const cat = createForm.category || "question";
+    
+    try {
+      const bubbleData = {
+        title: createForm.title.trim() || "Untitled",
+        description: createForm.desc.trim(),
+        category: cat,
+        attendees: n,
+        remoteFriendly: !!createForm.remoteFriendly,
+        owner: currentUser,
+        likes: 0, 
+        likedBy: [], 
+        joinedBy: [],
+        x: rand(r + 4, Math.max(r + 5, W - r - 5)),
+        y: rand(r + 4, Math.max(r + 5, H - r - 5)),
+        vx: rand(-1, 1) || 0.4,
+        vy: rand(-1, 1) || -0.3,
+        r,
+        color: categoryColor(cat),
+        timestamp: Timestamp.now(),
+        eventDate: createForm.eventDate ? Timestamp.fromDate(new Date(createForm.eventDate)) : Timestamp.now()
+      };
+      
+      await addDoc(bubblesCollection, bubbleData);
+      creating.value = false;
+    } catch (error) {
+      console.error('Error adding bubble:', error);
+    }
   }
   
   /* helpers */
@@ -416,13 +523,13 @@ function relaxPositions() {
   .small { width: 80px; }
   .select { height: 36px; border-radius: 10px; padding: 6px 10px; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.15); }
   
-  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); cursor: pointer; }
   .chip__label { opacity: .8; font-size: 14px; }
   .switch { position: relative; width: 44px; height: 24px; border-radius: 9999px; background: rgba(255,255,255,.2); border: none; cursor: pointer; }
   .switch__thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 9999px; background: #fff; transition: transform .2s; }
   .switch__thumb.on { transform: translateX(20px); }
   
-  .btn { padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); color: #fff; }
+  .btn { padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); color: #fff; cursor: pointer; }
   .btn--primary { background: #6366f1; border-color: transparent; }
   .btn--pink { background: #ec4899; border-color: transparent; }
   .btn--green { background: #10b981; border-color: transparent; }
@@ -433,7 +540,7 @@ function relaxPositions() {
   
   /* sub-tabs */
   .subtabs { position: absolute; top: 64px; left: 0; right: 0; z-index: 20; display: flex; justify-content: center; }
-  .tab { margin: 0 4px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); }
+  .tab { margin: 0 4px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); cursor: pointer; }
   .tab.active { background: #6366f1; border-color: transparent; }
   
   /* legend */
@@ -447,7 +554,7 @@ function relaxPositions() {
   .legend__swatch { width: 12px; height: 12px; border-radius: 9999px; box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset; }
   
   /* playfield */
-  .field { position: absolute; inset: 0; overflow: hidden; }
+  .field { position: absolute; top: 100px; left: 0; right: 0; bottom: 0; overflow: hidden; z-index: 1; }
   
   /* bubbles */
   .bubble { position: absolute; border: none; cursor: pointer; border-radius: 9999px; outline: none; background: transparent; padding: 0; transition: filter .12s; }
@@ -457,7 +564,7 @@ function relaxPositions() {
   
   .bubble__inner { width: 100%; height: 100%; border-radius: 9999px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 12px; position: relative; }
   .pill { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: rgba(16,185,129,.95); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 9999px; }
-  .bubble__title { font-weight: 700; color: rgba(255,255,255,.96); line-height: 1.2; word-break: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .bubble__title { font-weight: 700; color: rgba(255,255,255,.96); line-height: 1.2; word-break: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .bubble__meta { margin-top: 4px; opacity: .92; font-size: 13px; }
   .bubble__meta--sub { opacity: .8; font-size: 12px; }
   .likes { margin-top: 6px; font-size: 11px; display: flex; align-items: center; justify-content: center; }

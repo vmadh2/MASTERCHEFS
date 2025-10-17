@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, collection, Timestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDnilarzFeinGmd_su6c6NO79DZkBs1Nc4",
@@ -13,4 +13,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export { db };
+// Collections
+const bubblesCollection = collection(db, 'bubbles');
+const speedPassesCollection = collection(db, 'speed_passes');
+
+export { db, bubblesCollection, speedPassesCollection, Timestamp };
