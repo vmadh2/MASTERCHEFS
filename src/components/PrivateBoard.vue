@@ -1163,6 +1163,10 @@ export default {
   border: none;
   box-shadow: 4px 6px 8px rgba(0,0,0,0.15);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 .login-btn:active { transform: translateY(1px); }
 
