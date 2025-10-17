@@ -182,7 +182,7 @@
   /* utilities */
   const rand = (min, max) => Math.random() * (max - min) + min;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const radiusFromAttendees = (n) => 36 + Math.sqrt(Math.max(0, n)) * 10;
+  const radiusFromAttendees = (n) => 50 + Math.sqrt(Math.max(0, n)) * 10;
   
   // Calculate urgency-based size multiplier
   const getUrgencyMultiplier = (eventDate) => {
@@ -314,8 +314,8 @@
 
   // move + walls
   for (const b of bubbles.value) {
-    b.x += b.vx * 0.4;
-    b.y += b.vy * 0.4;
+    b.x += b.vx * 0.6; // Increased speed multiplier
+    b.y += b.vy * 0.6; // Increased speed multiplier
     wallBounce(b, W, H);
   }
 
@@ -585,4 +585,4 @@ function relaxPositions() {
   .card__actions { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; }
   .form { margin-top: 12px; display: grid; gap: 10px; }
   </style>
-  
+
