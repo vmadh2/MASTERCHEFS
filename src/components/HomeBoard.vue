@@ -300,20 +300,20 @@ export default {
     handleSpeedData(speedData) {
       const speedKph = speedData.speed_kph || 0;
       
-      // Determine bubble count based on speed ranges
+      // Determine bubble count based on realistic walking speed ranges
       let bubbleCount;
-      if (speedKph >= 20) {
-        // Very fast: show only 2 bubbles
+      if (speedKph >= 6.0) {
+        // Fast walking/brisk pace (6+ km/h): show only 2 bubbles for quick glance
         bubbleCount = 2;
-      } else if (speedKph >= 10) {
-        // Medium speed: show 4 bubbles
+      } else if (speedKph >= 3.0) {
+        // Moderate walking pace (3-6 km/h): show 4 bubbles for normal viewing
         bubbleCount = 4;
       } else {
-        // Slow speed: show all bubbles (default 5)
+        // Slow walking/leisurely stroll (0-3 km/h): show all bubbles (default 5)
         bubbleCount = 5;
       }
 
-      console.log(`🚀 Speed: ${speedKph} km/h, showing ${bubbleCount} bubbles`);
+      console.log(`�‍♂️ Walking speed: ${speedKph} km/h, showing ${bubbleCount} bubbles`);
       
       // Update notification data
       this.lastDetectedSpeed = speedKph.toFixed(2);
