@@ -12,16 +12,6 @@
     </div>
   </header>
 
-  <!-- Speed Detection Notification -->
-  <div v-if="speedNotification" class="speed-notification" :class="{ 'show': speedNotification }">
-    <div class="notification-content">
-      <h3>🚶‍♂️ Speed Detected!</h3>
-      <p>Speed: {{ lastDetectedSpeed }} km/h</p>
-      <p>Showing {{ currentBubbleCount }} bubbles</p>
-      <div class="notification-timer">Resetting in {{ resetCountdown }}s</div>
-    </div>
-  </div>
-
   <section class="hero is-light">
     <!-- The ref on this container is crucial for measuring dimensions -->
     <div class="content-container" ref="contentContainer">
@@ -45,8 +35,14 @@
       <!-- Debug Info (can be removed later) -->
       <div class="debug-info">
         <p>Listening for speed data: {{ speedListener ? 'Active' : 'Inactive' }}</p>
-        <p>Current bubble limit: {{ bubbleLimit || 'Default (5)' }}</p>
+        <p>Current bubble limit: {{ bubbleLimit || 'All bubbles' }}</p>
         <p>Bubbles displayed: {{ positionedItems.length }}</p>
+        <div v-if="lastDetectedSpeed > 0" class="speed-info">
+          <p><strong>🚶‍♂️ Speed Detection Active</strong></p>
+          <p>Speed: {{ lastDetectedSpeed }} km/h</p>
+          <p>Showing {{ currentBubbleCount }} bubbles</p>
+          <p v-if="resetCountdown > 0">Resetting in {{ resetCountdown }}s</p>
+        </div>
         <p>Last speed timestamp: {{ lastSpeedTimestamp ? new Date(lastSpeedTimestamp).toLocaleTimeString() : 'None' }}</p>
       </div>
 
@@ -138,11 +134,10 @@ export default {
       loading: { fetchAll: false },
       selectedItem: null,
       // Speed detection properties
-      bubbleLimit: null, // null means show default bubbles (5)
+      bubbleLimit: null, // null means show all bubbles
       resetTimer: null,
       lastSpeedTimestamp: null,
       speedListener: null,
-      speedNotification: false,
       lastDetectedSpeed: 0,
       currentBubbleCount: 5,
       resetCountdown: 0,
@@ -298,27 +293,26 @@ export default {
     },
 
     handleSpeedData(speedData) {
+      // Get speed in m/s (assume speed_kph is in km/h, convert to m/s)
       const speedKph = speedData.speed_kph || 0;
+      const speedMs = speedKph / 3.6; // Convert km/h to m/s
       
-      // Determine bubble count based on realistic walking speed ranges
-      let bubbleCount;
-      if (speedKph >= 6.0) {
-        // Fast walking/brisk pace (6+ km/h): show only 2 bubbles for quick glance
-        bubbleCount = 2;
-      } else if (speedKph >= 3.0) {
-        // Moderate walking pace (3-6 km/h): show 4 bubbles for normal viewing
-        bubbleCount = 4;
+      // Calculate time to walk 2 meters
+      let timeToWalk2m;
+      if (speedMs > 0) {
+        timeToWalk2m = 2 / speedMs; // seconds
       } else {
-        // Slow walking/leisurely stroll (0-3 km/h): show all bubbles (default 5)
-        bubbleCount = 5;
+        timeToWalk2m = 10; // Default high value for stationary
       }
-
-      console.log(`�‍♂️ Walking speed: ${speedKph} km/h, showing ${bubbleCount} bubbles`);
       
-      // Update notification data
+      // Round up to nearest whole number for bubble count
+      const bubbleCount = Math.ceil(timeToWalk2m);
+
+      console.log(`🚶‍♂️ Speed: ${speedKph} km/h (${speedMs.toFixed(2)} m/s), Time for 2m: ${timeToWalk2m.toFixed(2)}s, showing ${bubbleCount} bubbles`);
+      
+      // Update speed detection data (no popup)
       this.lastDetectedSpeed = speedKph.toFixed(2);
       this.currentBubbleCount = bubbleCount;
-      this.speedNotification = true;
       
       // Set the bubble limit
       this.bubbleLimit = bubbleCount;
@@ -346,8 +340,8 @@ export default {
       // Reset to normal state after 5 seconds
       this.resetTimer = setTimeout(() => {
         this.bubbleLimit = null; // Reset to show default number of bubbles
-        this.speedNotification = false;
         this.resetCountdown = 0;
+        this.lastDetectedSpeed = 0; // Clear speed detection display
         this.generateNonOverlappingLayout(); // Regenerate with default bubble count
         console.log('✅ Reset to normal bubble display');
       }, 5000);
@@ -398,8 +392,8 @@ export default {
       const allItems = this.sections.flatMap(s => s.items);
       const shuffled = allItems.sort(() => 0.5 - Math.random());
       
-      // Use bubble limit if set by speed detection, otherwise default to 5
-      const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : 5;
+      // Use bubble limit if set by speed detection, otherwise show all bubbles
+      const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : allItems.length;
       const itemsToPlace = shuffled.slice(0, itemsToShow);
 
       const placedBubbles = [];
@@ -408,8 +402,8 @@ export default {
         // Calculate dynamic size based on time delta
         const bubbleSize = this.calculateBubbleSize(item);
         
-        // Use Richard's fixed bubble size
-        const fixedSize = 160;
+        // Use larger bubble size when speed detection is active, otherwise use Richard's fixed size
+        const fixedSize = this.bubbleLimit !== null ? 220 : 160;
         const position = this.findValidPosition(placedBubbles, fixedSize, containerWidth, containerHeight);
 
         if (position) {
@@ -642,49 +636,6 @@ export default {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Speed Notification Styles */
-.speed-notification {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0);
-  background: #2d3748;
-  color: white;
-  padding: 24px;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-  z-index: 2000;
-  text-align: center;
-  min-width: 300px;
-  opacity: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.speed-notification.show {
-  transform: translate(-50%, -50%) scale(1);
-  opacity: 1;
-}
-
-.notification-content h3 {
-  margin: 0 0 12px 0;
-  font-size: 1.4em;
-  color: #4fd1c7;
-}
-
-.notification-content p {
-  margin: 8px 0;
-  font-size: 1.1em;
-}
-
-.notification-timer {
-  margin-top: 16px;
-  padding: 8px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 8px;
-  font-size: 0.9em;
-  color: #a0aec0;
-}
-
 /* Debug Info Styles */
 .debug-info {
   position: fixed;
@@ -702,6 +653,22 @@ export default {
 
 .debug-info p {
   margin: 4px 0;
+}
+
+.speed-info {
+  background: rgba(16, 185, 129, 0.2);
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+  border-left: 3px solid #10b981;
+}
+
+.speed-info p {
+  margin: 2px 0;
+}
+
+.speed-info strong {
+  color: #4fd1c7;
 }
 
 /* Test Button Styles */
