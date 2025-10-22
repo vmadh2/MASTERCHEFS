@@ -2,7 +2,7 @@
   <!-- Top bar (fixed) with Richard's improved styling -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="topbar-title">THE INTERACTIVE BULLETIN</div>
+      <div class="topbar-title">HuddleUp</div>
       <router-link :to="{ name: 'form-sheet' }" class="login-btn" role="button" aria-label="Open form sheet">
         Post
       </router-link>
@@ -17,14 +17,14 @@
     <div class="content-container" ref="contentContainer">
       <ul class="list">
         <!-- Loop over the 'positionedItems' data property with dynamic sizes -->
-        <li v-for="item in positionedItems" :key="item.id" 
-            class="list-item" 
+        <li v-for="item in positionedItems" :key="item.id"
+            class="list-item"
             :class="item.colorClass"
-            :style="{ ...item.position, ...item.dynamicStyle }" 
+            :style="{ ...item.position, ...item.dynamicStyle }"
             @click="selectItem(item)">
           <div class="item-title">{{ item.event_name }}</div>
           <div class="item-time">{{ formatTime(item.event_time) }}</div>
-          
+
 
         </li>
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
@@ -113,6 +113,18 @@
       </router-link>
       <div class="bottombar-right">Private</div>
     </div>
+    <!-- 💡 NEW: Floating Legend in Bottom Left Corner -->
+    <div class="floating-legend">
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-red"></span> Favour
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-blue"></span> Question
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-green"></span> Announcement
+      </div>
+    </div>
   </footer>
 </template>
 
@@ -152,20 +164,20 @@ export default {
         const now = new Date();
         const createdAt = new Date(item.bubble_created || item.event_time);
         const eventTime = new Date(item.event_when || item.event_time);
-        
+
         // Calculate time delta in hours
         const totalDeltaMs = Math.abs(eventTime.getTime() - createdAt.getTime());
         const remainingDeltaMs = Math.abs(eventTime.getTime() - now.getTime());
-        
+
         // Calculate urgency ratio (0 = just created, 1 = about to happen)
-        const urgencyRatio = totalDeltaMs > 0 ? 
+        const urgencyRatio = totalDeltaMs > 0 ?
           Math.max(0, Math.min(1, 1 - (remainingDeltaMs / totalDeltaMs))) : 0;
-        
+
         // Size range: 120px (far from event) to 200px (close to event)
         const minSize = 120;
         const maxSize = 200;
         const calculatedSize = minSize + (urgencyRatio * (maxSize - minSize));
-        
+
         console.log(`Bubble ${item.event_name}:`, {
           createdAt: createdAt.toLocaleString(),
           eventTime: eventTime.toLocaleString(),
@@ -175,9 +187,9 @@ export default {
           urgencyRatio: urgencyRatio.toFixed(3),
           size: Math.round(calculatedSize)
         });
-        
+
         return Math.round(calculatedSize);
-        
+
       } catch (error) {
         console.error('Error calculating bubble size for', item.event_name, error);
         return 150; // Default fallback size
@@ -229,7 +241,7 @@ export default {
     // --- SPEED DETECTION FUNCTIONALITY ---
     setupSpeedListener() {
       console.log('Setting up speed listener...');
-      
+
       try {
         const speedQuery = query(
           collection(db, 'speed_passes'),
@@ -239,36 +251,36 @@ export default {
 
         console.log('📡 Created query, setting up listener...');
 
-        this.speedListener = onSnapshot(speedQuery, 
+        this.speedListener = onSnapshot(speedQuery,
           (snapshot) => {
             console.log('📡 Speed snapshot received');
             console.log('Total docs in snapshot:', snapshot.size);
             console.log('Document changes:', snapshot.docChanges().length);
             console.log('Snapshot empty?', snapshot.empty);
-            
+
             if (snapshot.empty) {
               console.log('⚠️ Snapshot is empty - no documents found');
               return;
             }
-            
+
             snapshot.docs.forEach((doc, index) => {
               console.log(`Doc ${index}:`, doc.id, doc.data());
             });
-            
+
             snapshot.docChanges().forEach((change) => {
               console.log('🔄 Change detected:', {
                 type: change.type,
                 docId: change.doc.id,
                 data: change.doc.data()
               });
-              
+
               if (change.type === 'added') {
                 const data = change.doc.data();
                 console.log('🎯 SPEED DATA DETECTED (showing regardless of timestamp):', data);
-                
+
                 // Always handle the speed data - no timestamp checking
                 this.handleSpeedData(data);
-                
+
                 // Update timestamp for reference
                 const timestamp = data.created_at;
                 if (timestamp) {
@@ -277,16 +289,16 @@ export default {
                 }
               }
             });
-          }, 
+          },
           (error) => {
             console.error('❌ Speed listener error:', error);
             console.error('Error code:', error.code);
             console.error('Error message:', error.message);
           }
         );
-        
+
         console.log('✅ Speed listener setup complete');
-        
+
       } catch (error) {
         console.error('❌ Error setting up speed listener:', error);
       }
@@ -296,7 +308,7 @@ export default {
       // Get speed in m/s (assume speed_kph is in km/h, convert to m/s)
       const speedKph = speedData.speed_kph || 0;
       const speedMs = speedKph / 3.6; // Convert km/h to m/s
-      
+
       // Calculate time to walk 2 meters
       let timeToWalk2m;
       if (speedMs > 0) {
@@ -304,22 +316,22 @@ export default {
       } else {
         timeToWalk2m = 10; // Default high value for stationary
       }
-      
+
       // Round up to nearest whole number for bubble count
       const bubbleCount = Math.ceil(timeToWalk2m);
 
       console.log(`🚶‍♂️ Speed: ${speedKph} km/h (${speedMs.toFixed(2)} m/s), Time for 2m: ${timeToWalk2m.toFixed(2)}s, showing ${bubbleCount} bubbles`);
-      
+
       // Update speed detection data (no popup)
       this.lastDetectedSpeed = speedKph.toFixed(2);
       this.currentBubbleCount = bubbleCount;
-      
+
       // Set the bubble limit
       this.bubbleLimit = bubbleCount;
-      
+
       // Regenerate layout with new bubble count
       this.generateNonOverlappingLayout();
-      
+
       // Clear any existing timers
       if (this.resetTimer) {
         clearTimeout(this.resetTimer);
@@ -327,7 +339,7 @@ export default {
       if (this.countdownTimer) {
         clearInterval(this.countdownTimer);
       }
-      
+
       // Start countdown
       this.resetCountdown = 5;
       this.countdownTimer = setInterval(() => {
@@ -336,7 +348,7 @@ export default {
           clearInterval(this.countdownTimer);
         }
       }, 1000);
-      
+
       // Reset to normal state after 5 seconds
       this.resetTimer = setTimeout(() => {
         this.bubbleLimit = null; // Reset to show default number of bubbles
@@ -352,7 +364,7 @@ export default {
       try {
         const speedSnapshot = await getDocs(collection(db, 'speed_passes'));
         console.log('📊 Total speed documents found:', speedSnapshot.size);
-        
+
         speedSnapshot.forEach((doc) => {
           console.log('📄 Speed doc:', doc.id, doc.data());
         });
@@ -364,19 +376,19 @@ export default {
             orderBy('created_at', 'desc'),
             limit(1)
           );
-          
+
           const querySnapshot = await getDocs(speedQuery);
           if (!querySnapshot.empty) {
             const mostRecentDoc = querySnapshot.docs[0];
             console.log('🏆 Most recent speed doc:', mostRecentDoc.id, mostRecentDoc.data());
-            
+
             // Manually trigger speed detection with this data
             this.handleSpeedData(mostRecentDoc.data());
           }
         } else {
           console.log('❌ No documents found in speed_passes collection');
         }
-        
+
       } catch (error) {
         console.error('❌ Error testing speed connection:', error);
       }
@@ -391,7 +403,7 @@ export default {
       const containerHeight = container.clientHeight;
       const allItems = this.sections.flatMap(s => s.items);
       const shuffled = allItems.sort(() => 0.5 - Math.random());
-      
+
       // Use bubble limit if set by speed detection, otherwise show all bubbles
       const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : allItems.length;
       const itemsToPlace = shuffled.slice(0, itemsToShow);
@@ -401,7 +413,7 @@ export default {
       itemsToPlace.forEach(item => {
         // Calculate dynamic size based on time delta
         const bubbleSize = this.calculateBubbleSize(item);
-        
+
         // Use larger bubble size when speed detection is active, otherwise use Richard's fixed size
         const fixedSize = this.bubbleLimit !== null ? 220 : 160;
         const position = this.findValidPosition(placedBubbles, fixedSize, containerWidth, containerHeight);
@@ -419,7 +431,7 @@ export default {
           });
         }
       });
-      
+
       // CRITICAL: Actually set the positioned items
       this.positionedItems = placedBubbles;
     },
@@ -428,20 +440,20 @@ export default {
       const maxTries = 200; // Increased attempts for better placement
       const radius = diameter / 2;
       const padding = 20; // Increased padding between bubbles
-      
+
       // Safe zone boundaries (container is already constrained by fixed positioning)
       const sideMargin = 20;   // Margin from screen edges
-      
+
       // Calculate safe positioning area
       const safeLeft = sideMargin + radius;
       const safeRight = containerWidth - sideMargin - radius;
       const safeTop = radius + 10; // Small top buffer
       const safeBottom = containerHeight - radius - 10; // Small bottom buffer
-      
+
       // Ensure we have a valid safe area
       const safeWidth = safeRight - safeLeft;
       const safeHeight = safeBottom - safeTop;
-      
+
       if (safeWidth <= 0 || safeHeight <= 0) {
         console.warn('Safe area too small for bubble placement');
         return null;
@@ -464,13 +476,13 @@ export default {
             break;
           }
         }
-        
+
         if (!hasOverlap) {
           console.log(`Bubble placed at safe position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
           return { x, y };
         }
       }
-      
+
       // Improved fallback: use grid-based positioning if random fails
       console.warn('Random placement failed, using grid fallback');
       return this.findGridPosition(placedBubbles, diameter, containerWidth, containerHeight);
@@ -479,26 +491,26 @@ export default {
     findGridPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const radius = diameter / 2;
       const padding = 20;
-      
+
       // Safe zone boundaries (container is already constrained by fixed positioning)
       const sideMargin = 20;
-      
+
       const safeLeft = sideMargin + radius;
       const safeRight = containerWidth - sideMargin - radius;
       const safeTop = radius + 10;
       const safeBottom = containerHeight - radius - 10;
-      
+
       // Create a grid of potential positions
       const gridSpacing = diameter + padding;
       const cols = Math.floor((safeRight - safeLeft) / gridSpacing);
       const rows = Math.floor((safeBottom - safeTop) / gridSpacing);
-      
+
       // Try each grid position
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const x = safeLeft + (col * gridSpacing);
           const y = safeTop + (row * gridSpacing);
-          
+
           // Check if this position overlaps with any existing bubble
           let hasOverlap = false;
           for (const placed of placedBubbles) {
@@ -512,14 +524,14 @@ export default {
               break;
             }
           }
-          
+
           if (!hasOverlap) {
             console.log(`Grid placement successful at: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
             return { x, y };
           }
         }
       }
-      
+
       // Ultimate fallback: center position
       console.warn('Grid placement also failed, using center fallback');
       return {
@@ -587,17 +599,17 @@ export default {
   // --- LIFECYCLE HOOKS ---
   mounted() {
     console.log('🚀 HomeBoard mounted, fetching bubbles...');
-    
+
     this.fetchBubbles();
-    
+
     // Debounced resize handler to prevent excessive recalculations
     this.resizeHandler = this.debounce(() => {
       console.log('🔄 Window resized, repositioning bubbles...');
       this.generateNonOverlappingLayout();
     }, 300);
-    
+
     window.addEventListener('resize', this.resizeHandler);
-    
+
     // Set up speed monitoring after initial load
     console.log('Setting up speed listener in 2 seconds...');
     setTimeout(() => {
@@ -607,12 +619,12 @@ export default {
 
   beforeUnmount() {
     console.log('HomeBoard unmounting, cleaning up...');
-    
+
     // Clean up resize listener
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
     }
-    
+
     // Clean up listeners and timers
     if (this.speedListener) {
       this.speedListener();
@@ -738,7 +750,7 @@ export default {
 
 /* Speed Detection Enhancement */
 .list-item.speed-detected {
-  animation: float 8s ease-in-out infinite alternate, 
+  animation: float 8s ease-in-out infinite alternate,
              speedPulse 1.5s infinite,
              speedGlow 2s ease-in-out infinite alternate;
   border: 3px solid #10b981;
@@ -747,17 +759,17 @@ export default {
 }
 
 @keyframes speedPulse {
-  0% { 
+  0% {
     box-shadow: 0 0 30px rgba(16, 185, 129, 0.5),
-                0 6px 25px rgba(0, 0, 0, 0.2); 
+                0 6px 25px rgba(0, 0, 0, 0.2);
   }
-  50% { 
+  50% {
     box-shadow: 0 0 40px rgba(16, 185, 129, 0.8),
-                0 8px 30px rgba(0, 0, 0, 0.25); 
+                0 8px 30px rgba(0, 0, 0, 0.25);
   }
-  100% { 
+  100% {
     box-shadow: 0 0 30px rgba(16, 185, 129, 0.5),
-                0 6px 25px rgba(0, 0, 0, 0.2); 
+                0 6px 25px rgba(0, 0, 0, 0.2);
   }
 }
 
@@ -1023,5 +1035,41 @@ export default {
   border-radius: 50%;
   transition: transform 0.22s cubic-bezier(.2, .9, .2, 1);
 }
+
+/* --- 💡 NEW: Styles for the floating legend --- */
+.floating-legend {
+  position: fixed;
+  bottom: 90px;
+  right: 20px; /* Position from left padding */
+  background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+  backdrop-filter: blur(5px);
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 8px; /* Space between items */
+  z-index: 500; /* Ensure it's above background but below modal */
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  /* Colors are applied via is-pastel-* classes */
+}
+
+.legend-item span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748; /* Darker text for readability */
+}
+
 </style>
 

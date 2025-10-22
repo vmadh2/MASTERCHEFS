@@ -1,7 +1,7 @@
 <template>
   <div class="form-page">
     <nav class="taskbar">
-      <span class="app-title">Office Favours</span>
+      <span class="app-title">HuddleUp</span>
     </nav>
     <div class="form-container">
       <form @submit.prevent="sendData">
@@ -15,19 +15,20 @@
         </select>
 
         <label>Name:</label>
-        <input type="text" required v-model="authorName" />
+        <input type="text" required v-model="authorName" placeholder="Enter your name:"/>
 
         <label>Contact:</label>
-        <input type="email" required v-model="authorContact" />
+        <input type="email" required v-model="authorContact" placeholder="Enter your email in the format: ___@___.___"/>
 
         <label>Event Title:</label>
-        <input type="text" required v-model="eventTitle" />
+        <input type="text" required v-model="eventTitle" placeholder="Enter event title:"/>
 
         <label>Date and Time of Event:</label>
-        <input type="datetime-local" required v-model="eventWhen" />
+        <input type="datetime-local" required v-model="eventWhen"/>
+        <small class="hint">Please use the date-time picker to the right →</small>
 
         <label>Event Description:</label>
-        <textarea required v-model="description" rows="5" placeholder="Enter full details about the event..."></textarea>
+        <textarea required v-model="description" rows="5" placeholder="Enter full details about the event:"></textarea>
 
         <!-- added: Back to Home button (left) -->
         <router-link :to="{ name: 'home-board' }" class="post-btn back-btn" role="button" aria-label="Back to home">Back to Home</router-link>
@@ -106,7 +107,7 @@ export default {
 .taskbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   background: #7fdbe7;
   padding: 16px 32px;
   border-radius: 0 0 16px 16px;
@@ -227,5 +228,10 @@ textarea {
   background-size: cover;
   margin: 0;
   padding: 0;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: #777;
 }
 </style>

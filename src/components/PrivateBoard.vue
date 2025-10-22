@@ -3,7 +3,7 @@
   <!-- Top bar (fixed) matching provided design -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="topbar-title">"THE INTERACTIVE BULLETIN"</div>
+      <div class="topbar-title">HuddleUp</div>
       <router-link
         :to="{ name: 'form-sheet' }"
         class="login-btn"
@@ -26,7 +26,7 @@
         <option value="announcement">Announcement</option>
       </select>
     </div>
-    
+
     <div class="filter-section">
       <label>Filter by Status:</label>
       <select v-model="likedFilter">
@@ -37,7 +37,7 @@
     </div>
 
     <div class="filter-stats">
-      Showing {{ positionedItems.length }} of {{ filteredItems.length }} filtered 
+      Showing {{ positionedItems.length }} of {{ filteredItems.length }} filtered
       ({{ allBubblesData.length }} total) | ❤️ {{ likedBubbles.size }} liked
     </div>
   </div>
@@ -47,17 +47,17 @@
     <div class="content-container" ref="contentContainer">
       <ul class="list">
         <!-- Loop over the 'positionedItems' data property with dynamic sizes -->
-        <li v-for="item in positionedItems" :key="item.id" 
-            class="list-item" 
+        <li v-for="item in positionedItems" :key="item.id"
+            class="list-item"
             :class="item.colorClass"
-            :style="{ ...item.position, ...item.dynamicStyle }" 
+            :style="{ ...item.position, ...item.dynamicStyle }"
             @click="selectItem(item)">
           <div class="item-title">{{ item.event_name }}</div>
           <div class="item-time">{{ formatTime(item.event_time) }}</div>
-          
+
           <!-- Like Heart Button -->
-          <button 
-            class="like-btn" 
+          <button
+            class="like-btn"
             :class="{ 'liked': isLiked(item.id) }"
             @click.stop="toggleLike(item)"
             :title="isLiked(item.id) ? 'Unlike' : 'Like'"
@@ -174,6 +174,18 @@
 
       <div class="bottombar-right">Private</div>
     </div>
+    <!-- 💡 NEW: Floating Legend in Bottom Left Corner -->
+    <div class="floating-legend">
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-red"></span> Favour
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-blue"></span> Question
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot is-pastel-green"></span> Announcement
+      </div>
+    </div>
   </footer>
   </div>
 </template>
@@ -208,10 +220,10 @@ export default {
       // Return full data for liked bubbles
       return this.allBubblesData.filter(bubble => this.likedBubbles.has(bubble.id));
     },
-    
+
     filteredItems() {
       let filtered = [...this.allBubblesData];
-      
+
       // Filter by type
       if (this.typeFilter !== 'all') {
         filtered = filtered.filter(item => {
@@ -219,14 +231,14 @@ export default {
           return type.includes(this.typeFilter);
         });
       }
-      
+
       // Filter by liked status
       if (this.likedFilter === 'liked') {
         filtered = filtered.filter(item => this.likedBubbles.has(item.id));
       } else if (this.likedFilter === 'unliked') {
         filtered = filtered.filter(item => !this.likedBubbles.has(item.id));
       }
-      
+
       return filtered;
     }
   },
@@ -234,7 +246,7 @@ export default {
     // --- LIKING FUNCTIONALITY ---
     toggleLike(item) {
       console.log('Toggle like for:', item.id, item.event_name);
-      
+
       if (this.likedBubbles.has(item.id)) {
         // Unlike
         this.likedBubbles.delete(item.id);
@@ -244,16 +256,16 @@ export default {
         this.likedBubbles.add(item.id);
         console.log('Liked:', item.event_name);
       }
-      
+
       // Save to localStorage
       this.saveLikesToStorage();
-      
+
       // Only regenerate layout if we're filtering by liked status
       // This prevents unnecessary repositioning when just liking/unliking
       if (this.likedFilter !== 'all') {
         this.generateNonOverlappingLayout();
       }
-      
+
       // Force reactivity update for like buttons and counters
       this.$forceUpdate();
     },
@@ -290,12 +302,12 @@ export default {
       if (confirm('Are you sure you want to clear all liked bubbles?')) {
         this.likedBubbles.clear();
         this.saveLikesToStorage();
-        
+
         // Only regenerate layout if we're filtering by liked status
         if (this.likedFilter !== 'all') {
           this.generateNonOverlappingLayout();
         }
-        
+
         this.$forceUpdate();
         console.log('Cleared all likes');
       }
@@ -307,20 +319,20 @@ export default {
         const now = new Date();
         const createdAt = new Date(item.bubble_created || item.event_time);
         const eventTime = new Date(item.event_when || item.event_time);
-        
+
         // Calculate time delta in hours
         const totalDeltaMs = Math.abs(eventTime.getTime() - createdAt.getTime());
         const remainingDeltaMs = Math.abs(eventTime.getTime() - now.getTime());
-        
+
         // Calculate urgency ratio (0 = just created, 1 = about to happen)
-        const urgencyRatio = totalDeltaMs > 0 ? 
+        const urgencyRatio = totalDeltaMs > 0 ?
           Math.max(0, Math.min(1, 1 - (remainingDeltaMs / totalDeltaMs))) : 0;
-        
+
         // Size range: 120px (far from event) to 200px (close to event)
         const minSize = 120;
         const maxSize = 200;
         const calculatedSize = minSize + (urgencyRatio * (maxSize - minSize));
-        
+
         console.log(`Bubble ${item.event_name}:`, {
           createdAt: createdAt.toLocaleString(),
           eventTime: eventTime.toLocaleString(),
@@ -330,9 +342,9 @@ export default {
           urgencyRatio: urgencyRatio.toFixed(3),
           size: Math.round(calculatedSize)
         });
-        
+
         return Math.round(calculatedSize);
-        
+
       } catch (error) {
         console.error('Error calculating bubble size for', item.event_name, error);
         return 150; // Default fallback size
@@ -395,9 +407,9 @@ export default {
 
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
-      
+
       console.log(`Container dimensions: ${containerWidth}x${containerHeight}`);
-      
+
       // Use filtered items instead of all items
       const itemsToPlace = this.filteredItems.slice(0, 8); // Reduced to 8 for better spacing
 
@@ -412,7 +424,7 @@ export default {
           // Convert to percentage positioning but keep pixel values for collision detection
           const leftPercent = (position.x / containerWidth) * 100;
           const topPercent = (position.y / containerHeight) * 100;
-          
+
           placedBubbles.push({
             ...item,
             position: {
@@ -423,13 +435,13 @@ export default {
             py: position.y,
             diameter: fixedSize
           });
-          
+
           console.log(`Placed bubble ${index + 1}: ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%`);
         } else {
           console.warn(`Failed to place bubble ${item.event_name}`);
         }
       });
-      
+
       // Set the positioned items
       this.positionedItems = placedBubbles;
       console.log(`Total bubbles placed: ${placedBubbles.length} out of ${itemsToPlace.length}`);
@@ -438,23 +450,23 @@ export default {
     findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const radius = diameter / 2;
       const padding = 30; // Increased padding for better spacing
-      
+
       // Safe zone boundaries - more conservative margins
       const sideMargin = 30;
       const topMargin = 30;
       const bottomMargin = 30;
-      
+
       // Calculate safe positioning area
       const safeLeft = sideMargin + radius;
       const safeRight = containerWidth - sideMargin - radius;
       const safeTop = topMargin + radius;
       const safeBottom = containerHeight - bottomMargin - radius;
-      
+
       const safeWidth = safeRight - safeLeft;
       const safeHeight = safeBottom - safeTop;
-      
+
       console.log(`Safe area: ${safeWidth}x${safeHeight} (${safeLeft}, ${safeTop} to ${safeRight}, ${safeBottom})`);
-      
+
       if (safeWidth <= 0 || safeHeight <= 0) {
         console.warn('Safe area too small for bubble placement');
         return null;
@@ -477,7 +489,7 @@ export default {
           return { x, y };
         }
       }
-      
+
       console.warn('All placement attempts failed');
       return null;
     },
@@ -485,24 +497,24 @@ export default {
     findGridPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const radius = diameter / 2;
       const padding = 30;
-      
+
       // Safe zone boundaries - match the main positioning logic
       const sideMargin = 30;
       const topMargin = 30;
       const bottomMargin = 30;
-      
+
       const safeLeft = sideMargin + radius;
       const safeRight = containerWidth - sideMargin - radius;
       const safeTop = topMargin + radius;
       const safeBottom = containerHeight - bottomMargin - radius;
-      
+
       // Create a more flexible grid
       const gridSpacing = diameter + padding;
       const cols = Math.max(1, Math.floor((safeRight - safeLeft) / gridSpacing));
       const rows = Math.max(1, Math.floor((safeBottom - safeTop) / gridSpacing));
-      
+
       console.log(`Grid: ${cols}x${rows}, spacing: ${gridSpacing}`);
-      
+
       // Create array of all grid positions and shuffle them for variety
       const positions = [];
       for (let row = 0; row < rows; row++) {
@@ -512,10 +524,10 @@ export default {
           positions.push({ x, y });
         }
       }
-      
+
       // Shuffle positions for variety
       positions.sort(() => Math.random() - 0.5);
-      
+
       // Try each grid position
       for (const pos of positions) {
         if (this.isPositionValid(pos.x, pos.y, radius, placedBubbles, padding)) {
@@ -523,7 +535,7 @@ export default {
           return pos;
         }
       }
-      
+
       console.warn('Grid placement failed');
       return null;
     },
@@ -610,20 +622,20 @@ export default {
 
   mounted() {
     console.log('🚀 PrivateBoard mounted, fetching bubbles...');
-    
+
     // Load likes from localStorage first
     this.loadLikesFromStorage();
-    
+
     this.fetchBubbles();
-    
+
     // Debounced resize handler to prevent excessive recalculations
     this.resizeHandler = this.debounce(() => {
       console.log('🔄 PrivateBoard window resized, repositioning bubbles...');
       this.generateNonOverlappingLayout();
     }, 300);
-    
+
     window.addEventListener('resize', this.resizeHandler);
-    
+
     // Ensure layout is generated after DOM is fully rendered
     this.$nextTick(() => {
       setTimeout(() => {
@@ -634,7 +646,7 @@ export default {
 
   beforeUnmount() {
     console.log('PrivateBoard unmounting, cleaning up...');
-    
+
     // Clean up resize listener
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
@@ -1118,11 +1130,11 @@ export default {
 
 /* Richard's PrivateBoard float animation - centered positioning */
 @keyframes float {
-  from { 
-    transform: translate(-50%, -50%) translateY(0px); 
+  from {
+    transform: translate(-50%, -50%) translateY(0px);
   }
-  to { 
-    transform: translate(-50%, -50%) translateY(-15px); 
+  to {
+    transform: translate(-50%, -50%) translateY(-15px);
   }
 }
 
@@ -1147,6 +1159,7 @@ export default {
   position: relative;
 }
 .topbar-title {
+  font-weight: bold;
   font-size: 20px;
   color: #073642;
 }
@@ -1155,7 +1168,7 @@ export default {
   right: 18px;
   top: 12px;
   height: 48px;
-  padding: 0 20px;
+  padding: 0 24px;
   border-radius: 10px;
   background: #a16d3a;
   color: white;
@@ -1191,12 +1204,12 @@ export default {
   padding-right: 18px;
   box-sizing: border-box;
 }
-.bottombar-left, .bottombar-right { 
-  color: #073642; 
+.bottombar-left, .bottombar-right {
+  color: #073642;
   flex-shrink: 0;
 }
-.bottombar-toggle { 
-  display: flex; 
+.bottombar-toggle {
+  display: flex;
   align-items: center;
   flex-shrink: 0;
 }
@@ -1231,9 +1244,9 @@ export default {
   transform: translateX(30px); /* Move to right side */
 }
 
-.hero.is-light { 
-  padding-top: 0; 
-  padding-bottom: 0; 
+.hero.is-light {
+  padding-top: 0;
+  padding-bottom: 0;
   background: transparent; /* Ensure no background flicker */
 }
 
@@ -1246,6 +1259,41 @@ export default {
 }
 .is-pastel-green {
   background: linear-gradient(135deg, #69f0ae, #00c853);
+}
+
+/* --- 💡 NEW: Styles for the floating legend --- */
+.floating-legend {
+  position: fixed;
+  bottom: 90px;
+  right: 20px; /* Position from left padding */
+  background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+  backdrop-filter: blur(5px);
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 8px; /* Space between items */
+  z-index: 500; /* Ensure it's above background but below modal */
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  /* Colors are applied via is-pastel-* classes */
+}
+
+.legend-item span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748; /* Darker text for readability */
 }
 
 /* Keyframe animation for floating */
