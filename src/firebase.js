@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, collection, Timestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDnilarzFeinGmd_su6c6NO79DZkBs1Nc4",
@@ -13,4 +13,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export { db };
+// Export commonly used collections and utilities
+export const bubblesCollection = collection(db, 'bubbles');
+export { db, Timestamp };
