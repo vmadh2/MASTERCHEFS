@@ -12,7 +12,7 @@
       >
       Post
       </router-link>
-      <!-- <router-link
+      <router-link
         :to="{ name: 'test' }"
         class="test-btn"
         role="button"
@@ -20,7 +20,7 @@
         style="display:flex;align-items:center;justify-content:center"
       >
       Test
-      </router-link> -->
+      </router-link>
     </div>
   </header>
 
