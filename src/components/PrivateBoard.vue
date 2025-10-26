@@ -68,11 +68,11 @@
         <li v-if="positionedItems.length === 0 && !loading.fetchAll" class="empty">No items to display</li>
       </ul>
 
-      <!-- Liked Items Counter -->
+      <!-- Liked Items Counter
       <div class="liked-counter">
         <span>❤️ {{ likedBubbles.size }} bubbles liked</span>
         <button @click="showLikedModal = true" class="view-liked-btn">View Liked</button>
-      </div>
+      </div> -->
 
       <!-- Liked Bubbles Modal -->
       <div v-if="showLikedModal" class="liked-modal" @click.self="showLikedModal = false">
@@ -174,7 +174,7 @@
 
       <div class="bottombar-right">Private</div>
     </div>
-    <!-- 💡 NEW: Floating Legend in Bottom Left Corner -->
+    <!-- Floating Legend in Top Right Corner -->
     <div class="floating-legend">
       <div class="legend-item">
         <span class="legend-dot is-pastel-red"></span> Favour
@@ -1264,8 +1264,8 @@ export default {
 /* --- 💡 NEW: Styles for the floating legend --- */
 .floating-legend {
   position: fixed;
-  bottom: 90px;
-  right: 20px; /* Position from left padding */
+  top: 170px;
+  right: 10px; /* Position from left padding */
   background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
   backdrop-filter: blur(5px);
   padding: 12px 16px;
