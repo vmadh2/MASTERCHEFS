@@ -1203,6 +1203,7 @@ export default {
   gap: 12px;
   padding-right: 18px;
   box-sizing: border-box;
+  font-weight: bold;
 }
 .bottombar-left, .bottombar-right {
   color: #073642;

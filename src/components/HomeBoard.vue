@@ -956,6 +956,7 @@ export default {
   align-items: center;
   padding: 0 18px;
   box-sizing: border-box;
+  font-weight: bold;
 }
 
 .topbar-inner {
