@@ -10,7 +10,7 @@
         <select v-model="eventType" required>
           <option value="" disabled>Select category</option>
           <option value="Favour">Favour</option>
-          <option value="Question">Question</option>
+          <option value="Activity">Activity</option>
           <option value="Announcement">Announcement</option>
         </select>
 

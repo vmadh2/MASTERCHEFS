@@ -22,7 +22,7 @@
       <select v-model="typeFilter">
         <option value="all">All Types</option>
         <option value="favour">Favour</option>
-        <option value="question">Question</option>
+        <option value="activity">Activity</option>
         <option value="announcement">Announcement</option>
       </select>
     </div>
@@ -180,7 +180,7 @@
         <span class="legend-dot is-pastel-red"></span> Favour
       </div>
       <div class="legend-item">
-        <span class="legend-dot is-pastel-blue"></span> Question
+        <span class="legend-dot is-pastel-blue"></span> Activity
       </div>
       <div class="legend-item">
         <span class="legend-dot is-pastel-green"></span> Announcement
@@ -200,7 +200,7 @@ export default {
     return {
       sections: [
         { key: 'favour', label: 'Favour', items: [] },
-        { key: 'question', label: 'Question', items: [] },
+        { key: 'activity', label: 'activity', items: [] },
         { key: 'announcement', label: 'Announcement', items: [] },
       ],
       positionedItems: [],
@@ -211,7 +211,7 @@ export default {
       likedBubbles: new Set(), // Store liked bubble IDs
       showLikedModal: false,
       // Filtering
-      typeFilter: 'all', // all, favour, question, announcement
+      typeFilter: 'all', // all, favour, activity, announcement
       likedFilter: 'all', // all, liked, unliked
     };
   },
@@ -382,7 +382,7 @@ export default {
             this.allBubblesData.push(item);
 
             if (type.includes('favour')) this.sections[0].items.push(item);
-            else if (type.includes('question')) this.sections[1].items.push(item);
+            else if (type.includes('activity')) this.sections[1].items.push(item);
             else this.sections[2].items.push(item);
           } else {
             console.log(`Filtering out expired event: ${item.event_name} (${eventTime.toLocaleString()})`);
@@ -452,9 +452,9 @@ export default {
       const padding = 30; // Increased padding for better spacing
 
       // Safe zone boundaries - more conservative margins
-      const sideMargin = 30;
+      const sideMargin = 75;
       const topMargin = 30;
-      const bottomMargin = 30;
+      const bottomMargin = 150;
 
       // Calculate safe positioning area
       const safeLeft = sideMargin + radius;
@@ -569,7 +569,7 @@ export default {
 
     getColorForType(type) {
       if (type.includes('favour')) return 'is-pastel-red';
-      if (type.includes('question')) return 'is-pastel-blue';
+      if (type.includes('activity')) return 'is-pastel-blue';
       return 'is-pastel-green'; // Announcement
     },
 
@@ -1267,7 +1267,7 @@ export default {
   position: fixed;
   bottom: 90px;
   right: 20px; /* Position from left padding */
-  background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+  background: rgba(255, 255, 255, 0.5); /* Semi-transparent white */
   backdrop-filter: blur(5px);
   padding: 12px 16px;
   border-radius: 12px;
