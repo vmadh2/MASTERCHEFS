@@ -3,7 +3,7 @@
     <!-- Top bar (fixed) -->
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="topbar-title">THE INTERACTIVE BULLETIN</div>
+        <div class="topbar-title">HuddleUp</div>
         <router-link
           :to="{ name: 'form-sheet' }"
           class="login-btn"
@@ -314,7 +314,17 @@ const loadLikesFromStorage = () => {
   }
 }
 const clearAllLikes = () => {
-  alert('Confirm clear all likes? (Needs modal)')
+  if (confirm('Are you sure you want to clear all liked bubbles?')) {
+    likedBubbles.value.clear()
+    saveLikesToStorage()
+
+    // Only regenerate layout if filtering by liked status
+    if (likedFilter.value !== 'all') {
+      generateNonOverlappingLayout()
+    }
+
+    console.log('Cleared all likes')
+  }
 }
 const getBubbleSize = (eventTitle) => {
   const len = eventTitle ? eventTitle.length : 0
@@ -889,7 +899,7 @@ onBeforeUnmount(() => {
 .topbar-title {
   font-size: 20px;
   color: #073642;
-  font-weight: 600;
+  font-weight: bold;
 }
 .login-btn {
   position: absolute;
