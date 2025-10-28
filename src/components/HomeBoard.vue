@@ -11,14 +11,6 @@
       >
         Post
       </router-link>
-      <router-link
-        :to="{ name: 'test' }"
-        class="test-btn"
-        role="button"
-        aria-label="Open test page"
-      >
-        Test
-      </router-link>
     </div>
   </header>
 
