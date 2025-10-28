@@ -63,6 +63,7 @@
           >
             <div class="item-title">{{ item.event_name }}</div>
             <div class="item-time">{{ formatTime(item.event_time) }}</div>
+            <div class="item-time">{{ item.event_author }}</div>
             <button
               class="like-btn"
               :class="{ liked: isLiked(item.id) }"
@@ -349,6 +350,7 @@ const fetchBubbles = async () => {
 
       const type = (d.event_type || 'misc').toString().toLowerCase()
       const eventName = d.event_title || 'Unnamed Event'
+      const eventAuthor = d.author_name
       const eventTimeISO = normalizeWhen(d.event_when || d.bubble_created) // Normalize the event time
       const eventTime = eventTimeISO ? new Date(eventTimeISO) : null // Create Date object
 
@@ -357,6 +359,7 @@ const fetchBubbles = async () => {
         bubbles.push({
           id: doc.id,
           event_name: eventName,
+          event_author: eventAuthor,
           event_time: eventTimeISO, // Store the normalized ISO string
           fullData: d,
           colorClass: getColorForType(type),
@@ -822,8 +825,20 @@ onBeforeUnmount(() => {
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .list-item:hover {
-  transform: translate(-50%, -50%) scale(1.05);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) scale(1.5); /* Slightly bigger scale */
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08), 0 25px 50px rgba(45, 55, 72, 0.15);
+  filter: brightness(1.05); /* Subtle brightness boost */
+}
+
+.list-item:hover::after {
+  content: "Click for details";
+  position: absolute;
+  bottom: -30px;
+  font-weight: bold;
+  font-size: 12px;
+  color: #666;
+  opacity: 0.8;
 }
 .size-s {
   width: 150px;
