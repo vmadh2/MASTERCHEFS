@@ -80,10 +80,10 @@ export default {
           event_attend: [this.authorName]
         };
 
-        // --- Use imported addDoc and bubblesCollection ---
-        await addDoc(collection(db, 'bubbles'), newPost);
+        // --- Use the imported bubblesCollection directly ---
+        await addDoc(bubblesCollection, newPost);
 
-        alert('Data sent to Firebase Firestore!');
+        alert('Your HUDDLE is now UP!');
 
         // Clear fields on success
         this.eventType = '';
