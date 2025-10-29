@@ -153,7 +153,10 @@ export default {
       lastDetectedSpeed: 0,
       currentBubbleCount: 5,
       resetCountdown: 0,
-      countdownTimer: null
+      countdownTimer: null,
+      // Progressive loading properties
+      visibleBubbleCount: 2, // Start with 2 bubbles visible
+      progressiveTimer: null
     };
   },
   methods: {
@@ -401,11 +404,18 @@ export default {
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
       const allItems = this.sections.flatMap(s => s.items);
-      const shuffled = allItems.sort(() => 0.5 - Math.random());
 
-      // Use bubble limit if set by speed detection, otherwise show all bubbles
-      const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : allItems.length;
-      const itemsToPlace = shuffled.slice(0, itemsToShow);
+      // Sort items by proximity to current time (closest first)
+      const now = new Date();
+      allItems.sort((a, b) => {
+        const timeA = new Date(a.event_time).getTime();
+        const timeB = new Date(b.event_time).getTime();
+        return Math.abs(timeA - now.getTime()) - Math.abs(timeB - now.getTime());
+      });
+
+      // Use bubble limit if set by speed detection, otherwise show progressive bubble count
+      const itemsToShow = this.bubbleLimit !== null ? this.bubbleLimit : this.visibleBubbleCount;
+      const itemsToPlace = allItems.slice(0, itemsToShow);
 
       const placedBubbles = [];
 
@@ -438,7 +448,7 @@ export default {
     findValidPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const maxTries = 200; // Increased attempts for better placement
       const radius = diameter / 2;
-      const padding = 20; // Increased padding between bubbles
+      const padding = 30; // Increased padding between bubbles
 
       // Safe zone boundaries (container is already constrained by fixed positioning)
       const sideMargin = 20;   // Margin from screen edges
@@ -489,7 +499,7 @@ export default {
 
     findGridPosition(placedBubbles, diameter, containerWidth, containerHeight) {
       const radius = diameter / 2;
-      const padding = 20;
+      const padding = 30;
 
       // Safe zone boundaries (container is already constrained by fixed positioning)
       const sideMargin = 20;
@@ -531,12 +541,9 @@ export default {
         }
       }
 
-      // Ultimate fallback: center position
-      console.warn('Grid placement also failed, using center fallback');
-      return {
-        x: containerWidth / 2,
-        y: containerHeight / 2
-      };
+      // No valid grid position found, return null to avoid overlap
+      console.warn('Grid placement also failed, no valid position found');
+      return null;
     },
 
     // --- HELPERS ---
@@ -614,6 +621,20 @@ export default {
     setTimeout(() => {
       this.setupSpeedListener();
     }, 2000);
+
+    
+    // // === PROGRESSIVE BUBBLE LOADING ===
+    // // Start with 2 bubbles, then add one every 30 seconds up to 5
+    // // To disable this feature, comment out or remove this entire block
+    // this.progressiveTimer = setInterval(() => {
+    //   if (this.visibleBubbleCount < 5) {
+    //     this.visibleBubbleCount++;
+    //     this.generateNonOverlappingLayout();
+    //     console.log(`Progressive loading: Now showing ${this.visibleBubbleCount} bubbles`);
+    //   }
+    // }, 10000); // 10 seconds
+    // // === END PROGRESSIVE BUBBLE LOADING ===
+    
   },
 
   beforeUnmount() {
@@ -633,6 +654,9 @@ export default {
     }
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer);
+    }
+    if (this.progressiveTimer) {
+      clearInterval(this.progressiveTimer);
     }
   }
 };

@@ -21,9 +21,9 @@
       <label>Filter by Type:</label>
       <select v-model="typeFilter">
         <option value="all">All Types</option>
-        <option value="favour">Favour</option>
-        <option value="question">Question</option>
-        <option value="announcement">Announcement</option>
+        <option value="favour">Food</option>
+        <option value="question">Favour</option>
+        <option value="announcement">Activity</option>
       </select>
     </div>
 
@@ -177,13 +177,13 @@
     <!-- Floating Legend in Top Right Corner -->
     <div class="floating-legend">
       <div class="legend-item">
-        <span class="legend-dot is-pastel-red"></span> Favour
+        <span class="legend-dot is-pastel-red"></span> Food
       </div>
       <div class="legend-item">
-        <span class="legend-dot is-pastel-blue"></span> Question
+        <span class="legend-dot is-pastel-blue"></span> Favour
       </div>
       <div class="legend-item">
-        <span class="legend-dot is-pastel-green"></span> Announcement
+        <span class="legend-dot is-pastel-green"></span> Activity
       </div>
     </div>
   </footer>
@@ -1046,8 +1046,8 @@ export default {
   position: fixed !important;
   top: 144px !important;
   bottom: 84px !important;
-  left: 12px !important;
-  right: 12px !important;
+  left: 30px !important; /* match sideMargin used in placement logic */
+  right: 30px !important; /* match sideMargin used in placement logic */
   box-sizing: border-box !important;
   overflow: hidden !important;
   padding: 0 !important;
@@ -1130,11 +1130,14 @@ export default {
 
 /* Richard's PrivateBoard float animation - centered positioning */
 @keyframes float {
-  from {
+  0% {
     transform: translate(-50%, -50%) translateY(0px);
   }
-  to {
+  50% {
     transform: translate(-50%, -50%) translateY(-15px);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
   }
 }
 
@@ -1264,7 +1267,7 @@ export default {
 /* --- 💡 NEW: Styles for the floating legend --- */
 .floating-legend {
   position: fixed;
-  top: 170px;
+  bottom: 85px;
   right: 10px; /* Position from left padding */
   background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
   backdrop-filter: blur(5px);
@@ -1296,19 +1299,8 @@ export default {
   color: #2d3748; /* Darker text for readability */
 }
 
-/* Keyframe animation for floating */
-@keyframes float {
-  0% { transform: translate(0, 0px); }
-  50% { transform: translate(0, 15px); }
-  100% { transform: translate(0, 0px); }
-}
-
-.bubble:nth-child(even) {
-    animation: float-h 12s ease-in-out infinite;
-}
-@keyframes float-h {
-  0% { transform: translate(0px, 0); }
-  50% { transform: translate(15px, 0); }
-  100% { transform: translate(0px, 0); }
-}
+/* Removed duplicate/conflicting float keyframes and horizontal float helpers.
+   Keeping a single float animation above that preserves the translate(-50%,-50%)
+   centering so animated transforms don't remove the centering offset and cause
+   bubbles to be clipped by the container edges. */
 </style>
