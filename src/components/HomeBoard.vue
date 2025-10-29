@@ -6,9 +6,9 @@
       <router-link :to="{ name: 'form-sheet' }" class="login-btn" role="button" aria-label="Open form sheet">
         Post
       </router-link>
-      <router-link :to="{ name: 'test' }" class="test-btn" role="button" aria-label="Open test page">
+      <!-- <router-link :to="{ name: 'test' }" class="test-btn" role="button" aria-label="Open test page">
         Test
-      </router-link>
+      </router-link> -->
     </div>
   </header>
 
@@ -116,13 +116,13 @@
     <!-- 💡 NEW: Floating Legend in Bottom Left Corner -->
     <div class="floating-legend">
       <div class="legend-item">
-        <span class="legend-dot is-pastel-red"></span> Favour
+        <span class="legend-dot is-pastel-red"></span> Food
       </div>
       <div class="legend-item">
-        <span class="legend-dot is-pastel-blue"></span> Question
+        <span class="legend-dot is-pastel-blue"></span> Favour
       </div>
       <div class="legend-item">
-        <span class="legend-dot is-pastel-green"></span> Announcement
+        <span class="legend-dot is-pastel-green"></span> Activity
       </div>
     </div>
   </footer>
