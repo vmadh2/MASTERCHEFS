@@ -398,24 +398,37 @@ const fetchBubbles = async () => {
   }
 }
 
+// --- 💡 NEW: REBUILT POSITIONING LOGIC ---
+
 const generateNonOverlappingLayout = () => {
   const container = contentContainer.value
   if (!container) return
   const { clientWidth: containerWidth, clientHeight: containerHeight } = container
-  const itemsToPlace = filteredItems.value.slice(0, 10)
+
+  // Don't slice! Let the algorithm try to place all filtered items.
+  const itemsToPlace = filteredItems.value;
+
   const placedBubbles = []
+  let placedCount = 0;
+
   itemsToPlace.forEach((item) => {
     const bubbleDiameter = item.sizeInfo.diameter
-    const position = findValidPosition(
+
+    // Call the new, unified placement function
+    const position = findAvailablePosition(
       placedBubbles,
       bubbleDiameter,
       containerWidth,
       containerHeight,
     )
+
+    // 💡 CRITICAL FIX: Only add the bubble IF a position was found
     if (position) {
+      placedCount++;
       placedBubbles.push({
         ...item,
         position: {
+          // Keep % based positioning, it's good for responsiveness
           left: `${(position.x / containerWidth) * 100}%`,
           top: `${(position.y / containerHeight) * 100}%`,
         },
@@ -424,117 +437,120 @@ const generateNonOverlappingLayout = () => {
         py: position.y,
         diameter: bubbleDiameter,
       })
+    } else {
+        // This is the new "fallback": just don't show the bubble
+        console.warn(`Could not find a valid position for bubble: "${item.event_name}". Skipping.`)
     }
   })
+
+  console.log(`Layout complete: Placed ${placedCount} of ${itemsToPlace.length} bubbles.`);
   positionedItems.value = placedBubbles
 }
 
-const findValidPosition = (placedBubbles, diameter, containerWidth, containerHeight) => {
-  const maxTries = 200
-  const radius = diameter / 2
-  const padding = 20
+/**
+ * Finds a valid position for a new bubble, avoiding overlaps.
+ * Tries random placement first, then a grid-based fallback.
+ * Returns null if no position is found.
+ */
+const findAvailablePosition = (placedBubbles, diameter, containerWidth, containerHeight) => {
+  const radius = diameter / 2;
 
-  // Define safe zones (avoid UI elements)
-  const topMargin = 20 // Top buffer
-  const bottomMargin = 150 // Space for legend (90px from bottom + 60px legend height)
-  const sideMargin = 20 // Left/right margins
+  // --- 1. Responsive Safe Zone & Padding ---
+  const isSmallScreen = containerWidth < 480;
+  const padding = isSmallScreen ? 8 : 20;
+  const sideMargin = isSmallScreen ? 10 : 20;
+  const topMargin = 20; // Clearance for filter bar
+  // Clearance for bottom bar (72px) + legend/counter (approx 40px + 20px padding)
+  const bottomMarginBuffer = 140;
 
-  // Calculate safe positioning area
-  const safeLeft = sideMargin + radius
-  const safeRight = containerWidth - sideMargin - radius
-  const safeTop = topMargin + radius
-  const safeBottom = containerHeight - bottomMargin - radius
+  // --- 2. Calculate Safe Zone ---
+  const safeLeft = sideMargin + radius;
+  const safeRight = containerWidth - sideMargin - radius;
+  const safeTop = topMargin + radius;
+  const safeBottom = containerHeight - bottomMarginBuffer - radius;
 
-  const safeWidth = safeRight - safeLeft
-  const safeHeight = safeBottom - safeTop
+  const safeWidth = safeRight - safeLeft;
+  const safeHeight = safeBottom - safeTop;
 
-  if (safeWidth <= 0 || safeHeight <= 0) {
-    console.warn('Safe area too small for bubble placement')
-    return null
+  // --- 3. Validate Safe Zone ---
+  // This check is crucial and was the source of the previous bug.
+  if (safeWidth <= 0 || safeHeight <= 0 || safeBottom <= safeTop) {
+    console.warn('Safe area is too small for placement.', { containerWidth, containerHeight, safeWidth, safeHeight });
+    return null; // No valid area to place anything
   }
 
-  for (let i = 0; i < maxTries; i++) {
-    // Generate position within safe boundaries
-    const x = Math.random() * safeWidth + safeLeft
-    const y = Math.random() * safeHeight + safeTop
+  // --- 4. Attempt Random Placement ---
+  const maxRandomTries = 200;
+  for (let i = 0; i < maxRandomTries; i++) {
+    const x = Math.random() * safeWidth + safeLeft;
+    const y = Math.random() * safeHeight + safeTop;
 
-    let hasOverlap = false
-
-    // Check collision with other bubbles
+    let hasOverlap = false;
     for (const placed of placedBubbles) {
-      const dx = x - placed.px
-      const dy = y - placed.py
-      const distance = Math.sqrt(dx * dx + dy * dy)
+      const dx = x - placed.px;
+      const dy = y - placed.py;
+      const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance < radius + placed.diameter / 2 + padding) {
-        hasOverlap = true
-        break
+        hasOverlap = true;
+        break;
       }
     }
 
     if (!hasOverlap) {
-      console.log(`✅ Bubble placed at safe position: x=${x.toFixed(1)}, y=${y.toFixed(1)}`)
-      return { x, y }
+      // console.log(`✅ Random placement success at: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+      return { x, y };
     }
   }
 
-  // Fallback: try grid-based placement
-  console.warn('Random placement failed, using grid fallback')
-  return findGridPosition(placedBubbles, diameter, containerWidth, containerHeight)
-}
+  // --- 5. Attempt Grid Placement (if Random failed) ---
+  console.warn(`Random placement failed for bubble (diameter: ${diameter}), attempting grid fallback...`);
 
-const findGridPosition = (placedBubbles, diameter, containerWidth, containerHeight) => {
-  const radius = diameter / 2
-  const padding = 20
+  const gridSpacing = diameter + padding;
+  // Ensure at least 1 col/row
+  const cols = Math.max(1, Math.floor(safeWidth / gridSpacing));
+  const rows = Math.max(1, Math.floor(safeHeight / gridSpacing));
 
-  // Use same safe zones as findValidPosition
-  const topMargin = 20
-  const bottomMargin = 150
-  const sideMargin = 20
+  // Calculate the actual step to fill the space
+  const colStep = cols > 1 ? safeWidth / (cols - 1) : 0;
+  const rowStep = rows > 1 ? safeHeight / (rows - 1) : 0;
 
-  const safeLeft = sideMargin + radius
-  const safeRight = containerWidth - sideMargin - radius
-  const safeTop = topMargin + radius
-  const safeBottom = containerHeight - bottomMargin - radius
-
-  // Create a grid of potential positions
-  const gridSpacing = diameter + padding
-  const cols = Math.floor((safeRight - safeLeft) / gridSpacing)
-  const rows = Math.floor((safeBottom - safeTop) / gridSpacing)
-
-  // Try each grid position
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const x = safeLeft + col * gridSpacing
-      const y = safeTop + row * gridSpacing
+      // Stagger the grid for a more "organic" feel
+      const xOffset = (row % 2) * (colStep / 2);
+      const x = safeLeft + (col * colStep) + xOffset;
+      const y = safeTop + (row * rowStep);
 
-      // Check if this position overlaps with any existing bubble
-      let hasOverlap = false
+      // Ensure x is still within bounds after staggering
+      if (x > safeRight + radius) continue; // Allow slight overflow for staggering
+
+      let hasOverlap = false;
       for (const placed of placedBubbles) {
-        const dx = x - placed.px
-        const dy = y - placed.py
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        const minDistance = radius + placed.diameter / 2 + padding
-
-        if (distance < minDistance) {
-          hasOverlap = true
-          break
+        const dx = x - placed.px;
+        const dy = y - placed.py;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < radius + placed.diameter / 2 + padding) {
+          hasOverlap = true;
+          break;
         }
       }
 
       if (!hasOverlap) {
-        console.log(`Grid placement successful at: x=${x.toFixed(1)}, y=${y.toFixed(1)}`)
-        return { x, y }
+        console.log(`Grid placement successful at: x=${x.toFixed(1)}, y=${y.toFixed(1)}`);
+        return { x, y };
       }
     }
   }
 
-  // Ultimate fallback: center position (avoiding legend)
-  console.warn('Grid placement also failed, using center fallback')
-  return {
-    x: containerWidth / 2,
-    y: (safeTop + safeBottom) / 2, // Center vertically within safe zone
-  }
-}
+  // --- 6. Final Failure ---
+  // This is what you wanted: if no space, return null.
+  console.error(`Grid placement also failed. No available position found for bubble.`);
+  return null;
+};
+
+// --- END OF NEW POSITIONING LOGIC ---
+
+
 const getColorForType = (type) => {
   if (type.includes('favour')) return 'is-pastel-red'
   if (type.includes('activity')) return 'is-pastel-blue'
